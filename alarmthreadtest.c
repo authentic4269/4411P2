@@ -12,7 +12,7 @@
 int x;
 
 
-int testthread(int* arg) {
+int test_thread(int* arg) {
 	//technically we can't rely on a serial order because
 	//it might be more than 1000 milliseconds between
 	//interrupts, but this is very unlikely. the test
@@ -31,10 +31,22 @@ int thread1(int* nothing) {
 	{
 		arg = (int *) malloc(sizeof(int));
 		*arg = i;
-		minithread_fork(testthread, arg);
+		minithread_fork(test_thread, arg);
 	}	
 
   return 0;
+}
+
+int get_priority_of_thread(int priority)
+{
+	unsigned int x = genintrand(100);
+	if (x > 90)
+		return 3;
+	if (x > 75)
+		return 2;
+	if (x > 50)
+		return 1;
+	return 0;
 }
 
 

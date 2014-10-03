@@ -17,7 +17,7 @@ int testthread(int* arg) {
 	//it might be more than 1000 milliseconds between
 	//interrupts, but this is very unlikely. the test
 	//assumes a serial order.
-	minithread_sleep_with_timeout((1 + *arg) * 1000);
+	minithread_sleep_with_timeout((1 + *arg) * 10000);
 	printf("Thread %d, x = %d\n", *arg, x);
 	assert(x == *arg);
 	x++;
@@ -27,7 +27,7 @@ int testthread(int* arg) {
 int thread1(int* nothing) {
 	int i;
 	int *arg;
-	for (i = 0; i < 10; i++)
+	for (i = 0; i < 3; i++)
 	{
 		arg = (int *) malloc(sizeof(int));
 		*arg = i;

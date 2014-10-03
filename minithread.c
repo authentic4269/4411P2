@@ -147,21 +147,24 @@ void
 minithread_stop() {
 	//Get next thread to be run
 	minithread_t oldThread = runningThread;
-	interrupt_level_t old_level = set_interrupt_level(DISABLED);
+	minithread_t to_run;
+	set_interrupt_level(DISABLED);
 
-	queue_dequeue(queue, (void **) &runningThread);
+	queue_dequeue(queue, (void **) &to_run);
 
-	if (runningThread == NULL)
+	if (to_run == NULL)
 	{
+		set_interrupt_level(ENABLED);
 		while (queue_length(queue) == 0);
-		queue_dequeue(queue, (void **) &runningThread);
+		set_interrupt_level(DISABLED);
+		queue_dequeue(queue, (void **) &to_run);
 	}
 	//Switch to the next thread to be "run"
 	//Set Status' of Threads
 	//oldThread->status = RUNABLE;
+	runningThread = to_run;
 
 	//runningThread->status = RUNNING;
-	set_interrupt_level(old_level);
 
 	//Set running thread as currently running thread
 	minithread_switch(oldThread->stack_top, runningThread->stack_top);
@@ -179,7 +182,6 @@ minithread_yield() {
 	//Variable Initization
 	minithread_t to_run;
 	minithread_t old_thread;
-//	interrupt_level_t old_level = 
 	set_interrupt_level(DISABLED);
 	//Retrieve to_run
 	queue_dequeue(queue, (void **) &to_run);
@@ -217,17 +219,39 @@ int placeholder(int *arg) {
 void 
 clock_handler(void* arg)
 {
-
-	interrupt_level_t old_level = set_interrupt_level(DISABLED);
+	minithread_t to_run;
+	minithread_t old_thread;
+	set_interrupt_level(DISABLED);
 	currentTime++;
 	quantaRemaining--;
 	callAlarms(alarms, currentTime);
+
 	if (quantaRemaining <= 0)
 	{
 		quantaRemaining = 1;
-		minithread_yield();
+
+		//Variable Initization
+		set_interrupt_level(DISABLED);
+		//Retrieve to_run
+		queue_dequeue(queue, (void **) &to_run);
+
+		//Ensure to_run was retreived properly
+		if (to_run == NULL)
+		{
+			return;
+		}
+
+		//Store last running thread
+		old_thread = runningThread;
+		//Store to_run thread as runningThread
+		runningThread = to_run;
+
+		//Add old thread to the end
+		queue_append(queue, (void *) old_thread);
+
+		//Switch to next thread (to_run) from old thread (runningThread)
+		minithread_switch(old_thread->stack_top, to_run->stack_top);
 	}
-	set_interrupt_level(old_level);
 }
 
 void

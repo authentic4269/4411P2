@@ -110,6 +110,7 @@ minithread_create(proc_t proc, arg_t arg) {
 	minithread_t newMinithread = (minithread_t) malloc(sizeof(struct minithread));
 	stack_pointer_t* stack_top = (stack_pointer_t*) malloc(sizeof(stack_pointer_t));
 	stack_pointer_t* stack_base = (stack_pointer_t*) malloc(sizeof(stack_pointer_t));
+	interrupt_level_t previousLevel;
 
 	*stack_base = NULL;
 
@@ -123,7 +124,10 @@ minithread_create(proc_t proc, arg_t arg) {
 	newMinithread->proc = proc;
 	newMinithread->arg = arg;
 	//newMinithread->status = WAITING;
+	previousLevel = set_interrupt_level(DISABLED);
 	newMinithread->id = threadId++;
+	set_interrupt_level(previousLevel);
+	
 	newMinithread->stack_base = stack_base;
 	newMinithread->stack_top = stack_top;
 

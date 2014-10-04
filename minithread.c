@@ -58,6 +58,7 @@ struct minithread {
 	stack_pointer_t *stack_top;
 };
 
+/*
 //HELPER FUNCTIONS
 int minithread_cleanup(arg_t arg)
 {
@@ -70,20 +71,18 @@ int minithread_cleanup(arg_t arg)
 		previousLevel = set_interrupt_level(DISABLED);
 
 		//Wait to be woken up
-		semaphore_P(cleanup_sem);
+		semaphore_P(cleanupSemaphore);
 
 		//Only cleanup when there are threads to cleanup
-		while (queue_length(cleanup_queue) > 0)
+		while (queue_length(queue_finished_threads) > 0)
 		{
 			//Get the next newMinithread for the thread to free up
-			queue_dequeue(cleanup_queue, (void**) &newMinithread);
+			queue_dequeue(queue_finished_threads, (void**) &newMinithread);
 
 			//Free the stack
 			minithread_free_stack(*(newMinithread->stack_base));
 
-			//Free the newMinithread & its malloc'd members
-			free(newMinithread->stack_base);
-			free(newMinithread->stack_top);	
+			//Free the newMinithread
 			free(newMinithread);
 		}
 
@@ -92,6 +91,20 @@ int minithread_cleanup(arg_t arg)
 	}
 
 	return 0;
+}*/
+
+int minithread_cleanup(arg_t arg)
+{
+	queue_t oldThreads = (queue_t) arg;
+	minithread_t oldThread;
+	while (queue_length(oldThreads) > 0)
+	{
+		queue_dequeue(oldThreads, (void **) &oldThread);
+		minithread_free_stack(*(oldThread->stack_base));
+		free(oldThread);
+	}
+	queue_free(oldThreads);
+	return 0;
 }
 
 void
@@ -99,14 +112,14 @@ minithread_exit(minithread_t thread)
 {
 	minithread_t to_run;
 	minithread_t old_thread;
-	queue_t old_threads;
+	queue_t oldThreads;
 	int start = get_priority_of_thread();
 	queue_append(queue_finished_threads, thread);
 	if (queue_length(queue_finished_threads) > 10)
 	{
-		old_threads = queue_finished_threads;
+		oldThreads = queue_finished_threads;
 		queue_finished_threads = queue_new();
-		minithread_fork(minithread_cleanup, (int *) old_threads);
+		minithread_fork(minithread_cleanup, (int *) oldThreads);
 	}
 	multilevel_queue_dequeue(multiqueue, start, (void **) &to_run);
 	if (to_run == NULL)
@@ -374,6 +387,8 @@ minithread_system_initialize(proc_t mainproc, arg_t mainarg) {
 	
 	//Set global runningThread to be mainThread
 	runningThread = mainThread;
+
+//	minithread_fork(minithread_cleanup, NULL);
 
 	minithread_clock_init(QUANTA, clock_handler);
 

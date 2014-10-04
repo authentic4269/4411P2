@@ -367,8 +367,8 @@ minithread_system_initialize(proc_t mainproc, arg_t mainarg) {
 	alarms = new_sortedlist();
 
 	//Create cleanup semaphore
-	cleanup_sem = semaphore_create();
-	semaphore_initialize(cleanup_sem, 0);
+	cleanupSemaphore = semaphore_create();
+	semaphore_initialize(cleanupSemaphore, 0);
 	
 	//Initialize time
 	currentTime = 0;

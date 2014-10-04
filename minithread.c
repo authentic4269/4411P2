@@ -44,6 +44,8 @@ static multilevel_queue_t multiqueue;
 //Queue of all FINISHED Threads
 static queue_t queue_finished_threads;
 
+//Cleanup Semaphore
+static semaphore_t cleanupSemaphore;
 
 /* minithread functions */
 struct minithread {
@@ -68,6 +70,41 @@ int minithread_cleanup(int *arg)
 		//free(oldThread);	
 	}
 	queue_free(old_threads);
+	return 0;
+}
+
+int minithread_cleanup(arg_t arg)
+{
+	minithread_t newMinithread;
+	interrupt_level_t previousLevel;
+
+	while (1)
+	{
+		//Editing the cleanup queue, so disable interrupts
+		previousLevel = set_interrupt_level(DISABLED);
+
+		//Wait to be woken up
+		semaphore_P(cleanup_sem);
+
+		//Only cleanup when there are threads to cleanup
+		while (queue_length(cleanup_queue) > 0)
+		{
+			//Get the next newMinithread for the thread to free up
+			queue_dequeue(cleanup_queue, (void**) &newMinithread);
+
+			//Free the stack
+			minithread_free_stack(*(newMinithread->stack_base));
+
+			//Free the newMinithread & its malloc'd members
+			free(newMinithread->stack_base);
+			free(newMinithread->stack_top);	
+			free(newMinithread);
+		}
+
+		//Restore interrupt level
+		set_interrupt_level(previousLevel);
+	}
+
 	return 0;
 }
 
@@ -320,17 +357,39 @@ minithread_sleep_with_timeout(int delay)
  */
 void
 minithread_system_initialize(proc_t mainproc, arg_t mainarg) {
-	minithread_t main_thread;
+	//Initialize mainThread
+	minithread_t mainThread = (minithread_t) malloc(sizeof(struct minithread));
+	
+	//Initialize idleThread
 	minithread_t idleThread;
-	alarms = new_sortedlist();	
+	
+	//Create alarms structure
+	alarms = new_sortedlist();
+
+	//Create cleanup semaphore
+	cleanup_sem = semaphore_create();
+	semaphore_initialize(cleanup_sem, 0);
+	
+	//Initialize time
 	currentTime = 0;
+
+	//Set Remaining Quanta to 0
 	quantaRemaining = 0;
+
+	//Make new multilevel_queue with 4 levels
 	multiqueue = multilevel_queue_new(4);
+
+	//Initialize finished threads queue
 	queue_finished_threads = queue_new();
+	
 	idleThread = minithread_create(placeholder, (arg_t) NULL);
 	queue_append(queue_finished_threads, idleThread);
-	main_thread = minithread_create(mainproc, mainarg);
-	runningThread = main_thread;
+	mainThread = minithread_create(mainproc, mainarg);
+	
+	//Set global runningThread to be mainThread
+	runningThread = mainThread;
+
 	minithread_clock_init(QUANTA, clock_handler);
-	minithread_switch(idleThread->stack_top, main_thread->stack_top);	
+
+	minithread_switch(idleThread->stack_top, mainThread->stack_top);	
 }

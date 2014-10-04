@@ -18,6 +18,9 @@ typedef struct multilevel_queue* multilevel_queue_t;
  */
 extern multilevel_queue_t multilevel_queue_new(int number_of_levels);
 
+extern int get_priority_of_thread();
+
+
 /*
  * Appends an void* to the multilevel queue at the specified level. Return 0 (success) or -1 (failure).
  */
@@ -39,5 +42,7 @@ extern int multilevel_queue_free(multilevel_queue_t queue);
 
 //Returns length of queue[level] in multilevel queue
 extern int multilevel_queue_length(multilevel_queue_t queue, int level);
+
+extern int multilevel_queue_fulllength(multilevel_queue_t queue);
 
 #endif /*__MULTILEVEL_QUEUE_H__*/

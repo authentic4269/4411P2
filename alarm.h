@@ -13,6 +13,7 @@
  */
 typedef void (*alarm_handler_t)(void*);
 typedef void *alarm_id;
+extern int currentTime;
 
 /* register an alarm to go off in "delay" milliseconds.  Returns a handle to
  * the alarm.

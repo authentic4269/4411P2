@@ -4,6 +4,7 @@
 #include "multilevel_queue.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include "random.h"
 
 /*
 Implement multilevel queues and use them to change your FCFS scheduler into a multilevel
@@ -106,6 +107,19 @@ int multilevel_queue_dequeue(multilevel_queue_t queue, int level, void** item)
 	return (((searchLevel-1)+level)%queue->levels);
 }
 
+int get_priority_of_thread()
+{
+	unsigned int x = genintrand(100);
+	if (x > 90)
+		return 3;
+	if (x > 75)
+		return 2;
+	if (x > 50)
+		return 1;
+	return 0;
+}
+
+
 /* 
  * Free the queue and return 0 (success) or -1 (failure). Do not free the queue nodes; this is
  * the responsibility of the programmer.
@@ -136,4 +150,15 @@ int multilevel_queue_length(multilevel_queue_t queue, int level)
 {
 	//queue_length will check if queue is null
 	return queue_length(queue->queues[level]);
+}
+
+int multilevel_queue_fulllength(multilevel_queue_t queue)
+{
+	int i;
+	int len = 0;
+	for (i = 0; i < queue->levels; i++)
+	{
+		len += multilevel_queue_length(queue, i);
+	}
+	return len;
 }

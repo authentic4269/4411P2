@@ -30,6 +30,7 @@ sortedlist_t alarms;
 int QUANTA = 100 * MILLISECOND;
 int currentTime;
 int quantaRemaining;
+int quantaAssignments[4] = {1, 2, 4, 8};
 
 //Keeps track of the RUNNING Thread
 static minithread_t runningThread;
@@ -38,7 +39,7 @@ static minithread_t runningThread;
 int threadId = 0;
 
 //Queue of all READY Threads
-static queue_t queue;
+static multilevel_queue_t multiqueue;
 
 //Queue of all FINISHED Threads
 static queue_t queue_finished_threads;
@@ -50,6 +51,7 @@ struct minithread {
 	arg_t arg;
 	int status;
 	int id;
+	int level;
 	stack_pointer_t *stack_base;
 	stack_pointer_t *stack_top;
 };
@@ -75,6 +77,7 @@ minithread_exit(minithread_t thread)
 	minithread_t to_run;
 	minithread_t old_thread;
 	queue_t old_threads;
+	int start = get_priority_of_thread();
 	queue_append(queue_finished_threads, thread);
 	if (queue_length(queue_finished_threads) > 10)
 	{
@@ -82,11 +85,11 @@ minithread_exit(minithread_t thread)
 		queue_finished_threads = queue_new();
 		minithread_fork(minithread_cleanup, (int *) old_threads);
 	}
-	queue_dequeue(queue, (void **) &to_run);
+	multilevel_queue_dequeue(multiqueue, start, (void **) &to_run);
 	if (to_run == NULL)
 	{
-		while (queue_length(queue) == 0);
-		queue_dequeue(queue, (void **) &to_run);
+		while (multilevel_queue_fulllength(multiqueue) == 0);
+		multilevel_queue_dequeue(multiqueue, 0, (void **) &to_run);
 	}
 	old_thread = runningThread;
 	runningThread = to_run;
@@ -99,7 +102,7 @@ minithread_fork(proc_t proc, arg_t arg) {
 	//Make newMinithread
 	minithread_t newMinithread = (minithread_t) minithread_create(proc, arg);
 	//Start newMinithread
-	queue_append(queue, newMinithread);
+	multilevel_queue_enqueue(multiqueue, 0, newMinithread);
 	//Return newMinithread
 	return (minithread_t) newMinithread;
 }
@@ -110,7 +113,6 @@ minithread_create(proc_t proc, arg_t arg) {
 	minithread_t newMinithread = (minithread_t) malloc(sizeof(struct minithread));
 	stack_pointer_t* stack_top = (stack_pointer_t*) malloc(sizeof(stack_pointer_t));
 	stack_pointer_t* stack_base = (stack_pointer_t*) malloc(sizeof(stack_pointer_t));
-	interrupt_level_t previousLevel;
 
 	*stack_base = NULL;
 
@@ -123,11 +125,9 @@ minithread_create(proc_t proc, arg_t arg) {
 	//Initialize the Minithread
 	newMinithread->proc = proc;
 	newMinithread->arg = arg;
+	newMinithread->level = 0;
 	//newMinithread->status = WAITING;
-	previousLevel = set_interrupt_level(DISABLED);
 	newMinithread->id = threadId++;
-	set_interrupt_level(previousLevel);
-	
 	newMinithread->stack_base = stack_base;
 	newMinithread->stack_top = stack_top;
 
@@ -152,16 +152,18 @@ minithread_stop() {
 	//Get next thread to be run
 	minithread_t oldThread = runningThread;
 	minithread_t to_run;
+	int start = get_priority_of_thread();
 	set_interrupt_level(DISABLED);
+	
 
-	queue_dequeue(queue, (void **) &to_run);
+	multilevel_queue_dequeue(multiqueue, start, (void **) &to_run);
 
 	if (to_run == NULL)
 	{
 		set_interrupt_level(ENABLED);
-		while (queue_length(queue) == 0);
+		while (multilevel_queue_fulllength(multiqueue) == 0);
 		set_interrupt_level(DISABLED);
-		queue_dequeue(queue, (void **) &to_run);
+		queue_dequeue(queue, start, (void **) &to_run);
 	}
 	//Switch to the next thread to be "run"
 	//Set Status' of Threads
@@ -177,7 +179,7 @@ minithread_stop() {
 void
 minithread_start(minithread_t t) {
 	interrupt_level_t old_level = set_interrupt_level(DISABLED);
-	queue_append(queue, t);
+	multilevel_queue_enqueue(multiqueue, 0, t);
 	set_interrupt_level(old_level);
 }
 
@@ -186,17 +188,18 @@ minithread_yield() {
 	//Variable Initization
 	minithread_t to_run;
 	minithread_t old_thread;
+	int start = get_priority_of_thread();
 	set_interrupt_level(DISABLED);
 	//Retrieve to_run
-	queue_dequeue(queue, (void **) &to_run);
+	multilevel_queue_dequeue(multiqueue, start, (void **) &to_run);
 	
 	//Ensure to_run was retreived properly
 	if (to_run == NULL)
 	{
 		set_interrupt_level(ENABLED);
-		while (queue_length(queue) == 0);
+		while (multilevel_queue_fulllength(multiqueue) == 0);
 		set_interrupt_level(DISABLED);
-		queue_dequeue(queue, (void **) &to_run);
+		multilevel_queue_dequeue(multiqueue, start, (void **) &to_run);
 	}
 	
 	//Store last running thread
@@ -205,7 +208,7 @@ minithread_yield() {
 	runningThread = to_run;
 
 	//Add old thread to the end
-	queue_append(queue, (void *) old_thread);
+	multilevel_queue_append(multiqueue, old_thread->level, (void *) old_thread);
 	
 	//Switch to next thread (to_run) from old thread (runningThread)
 	minithread_switch(old_thread->stack_top, to_run->stack_top);
@@ -225,6 +228,7 @@ clock_handler(void* arg)
 {
 	minithread_t to_run;
 	minithread_t old_thread;
+	int start = get_priority_of_thread();
 	set_interrupt_level(DISABLED);
 	currentTime++;
 	quantaRemaining--;
@@ -232,12 +236,8 @@ clock_handler(void* arg)
 
 	if (quantaRemaining <= 0)
 	{
-		quantaRemaining = 1;
-
-		//Variable Initization
-		set_interrupt_level(DISABLED);
 		//Retrieve to_run
-		queue_dequeue(queue, (void **) &to_run);
+		multilevel_queue_dequeue(multiqueue, start, (void **) &to_run);
 
 		//Ensure to_run was retreived properly
 		if (to_run == NULL)
@@ -249,13 +249,17 @@ clock_handler(void* arg)
 		old_thread = runningThread;
 		//Store to_run thread as runningThread
 		runningThread = to_run;
+		if (old_thread->level < 3)
+			old_thread->level++;
+		quantaRemaining = quantaAssignments[to_run->level];
 
 		//Add old thread to the end
-		queue_append(queue, (void *) old_thread);
+		multilevel_queue_enqueue(multiqueue, old_thread->level, (void *) old_thread);
 
 		//Switch to next thread (to_run) from old thread (runningThread)
 		minithread_switch(old_thread->stack_top, to_run->stack_top);
 	}
+	set_interrupt_level(ENABLED);
 }
 
 void
@@ -284,6 +288,7 @@ minithread_sleep_with_timeout(int delay)
 	//Interrupts are disabled so that if we context switch away the alarm will
 	//not be triggered before semaphore_P is called and will not hang forever
 	previousLevel = set_interrupt_level(DISABLED);
+	printf("delay: %d\n", delay);
 
 	//Register the alarm
 	register_alarm(delay, &minithread_sleep_alarm_wakeup, sleepSemaphore); 
@@ -320,12 +325,12 @@ minithread_system_initialize(proc_t mainproc, arg_t mainarg) {
 	alarms = new_sortedlist();	
 	currentTime = 0;
 	quantaRemaining = 0;
-	queue = queue_new();
+	multiqueue = multilevel_queue_new(4);
 	queue_finished_threads = queue_new();
 	idleThread = minithread_create(placeholder, (arg_t) NULL);
 	queue_append(queue_finished_threads, idleThread);
 	main_thread = minithread_create(mainproc, mainarg);
 	runningThread = main_thread;
-	minithread_clock_init(MILLISECOND, clock_handler);
+	minithread_clock_init(QUANTA, clock_handler);
 	minithread_switch(idleThread->stack_top, main_thread->stack_top);	
 }

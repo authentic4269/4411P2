@@ -59,20 +59,6 @@ struct minithread {
 };
 
 //HELPER FUNCTIONS
-int minithread_cleanup(int *arg)
-{
-	queue_t old_threads = (queue_t) arg;
-	minithread_t oldThread;
-	while (queue_length(old_threads) > 0)
-	{
-		queue_dequeue(old_threads, (void **) &oldThread);
-		//minithread_free_stack(*(oldThread->stack_base));
-		//free(oldThread);	
-	}
-	queue_free(old_threads);
-	return 0;
-}
-
 int minithread_cleanup(arg_t arg)
 {
 	minithread_t newMinithread;

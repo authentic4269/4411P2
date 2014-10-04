@@ -163,7 +163,7 @@ minithread_stop() {
 		set_interrupt_level(ENABLED);
 		while (multilevel_queue_fulllength(multiqueue) == 0);
 		set_interrupt_level(DISABLED);
-		queue_dequeue(queue, start, (void **) &to_run);
+		multilevel_queue_dequeue(multiqueue, start, (void **) &to_run);
 	}
 	//Switch to the next thread to be "run"
 	//Set Status' of Threads
@@ -208,7 +208,7 @@ minithread_yield() {
 	runningThread = to_run;
 
 	//Add old thread to the end
-	multilevel_queue_append(multiqueue, old_thread->level, (void *) old_thread);
+	multilevel_queue_enqueue(multiqueue, old_thread->level, (void *) old_thread);
 	
 	//Switch to next thread (to_run) from old thread (runningThread)
 	minithread_switch(old_thread->stack_top, to_run->stack_top);

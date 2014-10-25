@@ -188,9 +188,9 @@ queue_free (queue_t queue) {
 			frontNode = frontNode->next;
 			free(tempNode);							
 		}
+		free(queue);
 		return 0;
 	}
-	free(queue);
 	//else 
 	return -1;
 }

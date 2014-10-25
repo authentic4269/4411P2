@@ -99,7 +99,7 @@ int multilevel_queue_dequeue(multilevel_queue_t queue, int level, void** item)
 	//If found != 0, 
 	if (found != 0)
 	{
-		item = NULL;
+		*item = NULL;
 		return -1;
 	}
 

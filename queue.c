@@ -110,34 +110,35 @@ queue_append(queue_t queue, void* item) {
  */
 int
 queue_dequeue(queue_t queue, void** item) {
-	queueNode_t frontNode = queue->front;
+	queueNode_t frontNode;
 
 	//Check that queue and item exists
-	if (queue != NULL && item != NULL && frontNode != NULL) 
+	if (queue != NULL && item != NULL) 
 	{
-		*item = queue->front->data;
+		frontNode = queue->front;
+		if (frontNode != NULL)
+		{
+			*item = queue->front->data;
 
-		//Reassign front
-		queue->front = queue->front->next;
-		
-		if (queue->front != NULL)
-			queue->front->prev = NULL;
-		if(queue->size == 1)
-			queue->rear = NULL;
-		
-		free(frontNode);
-		
-		//Reflect that queue shrunk in size
-		queue->size--;
+			//Reassign front
+			queue->front = queue->front->next;
+			
+			if (queue->front != NULL)
+				queue->front->prev = NULL;
+			if (queue->size == 1)
+				queue->rear = NULL;
+			
+			free(frontNode);
+			
+			//Reflect that queue shrunk in size
+			queue->size--;
 
-		return 0;
+			return 0;
+		}
 	}
-	else
-	{
-		//return null and -1 if the queue is empty or item doesnt exist
-		*item = NULL;						
-		return -1;
-	}
+	//else return null and -1 if the queue is empty or item doesnt exist
+	*item = NULL;						
+	return -1;
 }
 
 /*
@@ -149,25 +150,28 @@ queue_dequeue(queue_t queue, void** item) {
 int
 queue_iterate(queue_t queue, func_t f, void* item) {
 	queueNode_t nextPtr;
-	queueNode_t currentPtr = queue->front;
+	queueNode_t currentPtr;
 
-	//Iterate from front to back
-	currentPtr = queue->front;
-
-	if (queue != NULL && f != NULL && currentPtr != NULL) 
+	if (queue != NULL && f != NULL)
 	{
-		while(currentPtr != NULL)
+		//Iterate from front to back
+		currentPtr = queue->front;
+
+		if (currentPtr != NULL)
 		{
-			nextPtr = currentPtr->next;
+			while (currentPtr != NULL)
+			{
+				nextPtr = currentPtr->next;
 
-			f(item, currentPtr->data);
+				f(item, currentPtr->data);
 
-			currentPtr = nextPtr;
+				currentPtr = nextPtr;
+			}
+			return 0;
 		}
-		return 0;
+		//else
+		return -1;
 	}
-	//else
-	return -1;
 }
 
 /*
@@ -222,10 +226,12 @@ queue_length(queue_t queue) {
 int
 queue_delete(queue_t queue, void* item) {
 	queueNode_t nodeToDelete;
-	queueNode_t currentPtr = queue->front;
+	queueNode_t currentPtr;
 	
 	if (queue != NULL && item != NULL)
 	{	
+		currentPtr = queue->front;
+
 		while (currentPtr != NULL)
 		{	
 			//Item Found

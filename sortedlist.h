@@ -29,4 +29,4 @@ extern int remove_node(sortedlist_t list, void *removeid);
 
 extern void insert(sortedlist_t list, listnode_t newnode);
 
-extern void callAlarms(sortedlist_t list, int curtime); 
+//extern void callAlarms(sortedlist_t list, int curtime); 

@@ -172,6 +172,7 @@ queue_iterate(queue_t queue, func_t f, void* item) {
 		//else
 		return -1;
 	}
+	return -1;
 }
 
 /*

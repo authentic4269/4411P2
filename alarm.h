@@ -1,5 +1,6 @@
 #ifndef __ALARM_H__
 #define __ALARM_H__ 1
+#include "sortedlist.h"
 
 /*
  * This is the alarm interface. You should implement the functions for these
@@ -25,4 +26,5 @@ alarm_id register_alarm(int delay, alarm_handler_t func, void *arg);
  */
 int deregister_alarm(alarm_id id);
 
+void callAlarms(sortedlist_t list, int curtime); 
 #endif

@@ -43,6 +43,19 @@ register_alarm(int delay, alarm_handler_t alarm, void *arg)
 
     return (alarm_id) node;
 }
+
+void callAlarms(sortedlist_t list, int current) 
+{
+	listnode_t cur = list->head;
+	listnode_t tmp;
+	while (cur != NULL && cur->time < current)
+	{
+		cur->func(cur->arg);
+		tmp = cur;
+		cur = cur->next;
+		remove_node(list, tmp->id);
+	}
+}
 	
 /* see alarm.h */
 int

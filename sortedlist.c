@@ -75,7 +75,7 @@ void insert(sortedlist_t list, listnode_t newnode)
 	}	
 }
 
-void callAlarms(sortedlist_t list, int current) 
+/*void callAlarms(sortedlist_t list, int current) 
 {
 	listnode_t cur = list->head;
 	listnode_t tmp;
@@ -86,4 +86,4 @@ void callAlarms(sortedlist_t list, int current)
 		cur = cur->next;
 		remove_node(list, tmp->id);
 	}
-}
+}*/

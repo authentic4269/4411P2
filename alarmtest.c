@@ -1,7 +1,7 @@
 #include<stdio.h>
 #include <assert.h>
 #include <stdlib.h>
-#include "sortedlist.h"
+#include "alarm.h"
 
 int x;
 

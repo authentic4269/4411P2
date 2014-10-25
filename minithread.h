@@ -2,7 +2,7 @@
 #define __MINITHREAD_H__
 
 #include "machineprimitives.h"
-#include "sortedlist.h"
+#include "alarm.h"
 
 /*
  * minithread.h:

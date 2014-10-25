@@ -61,7 +61,12 @@ void callAlarms(sortedlist_t list, int current)
 int
 deregister_alarm(alarm_id alarm)
 {
-    return !(remove_node(alarms, alarm));
+    int ret;
+    interrupt_level_t previousLevel;
+    previousLevel = set_interrupt_level(DISABLED);
+    ret = !(remove_node(alarms, alarm));
+    set_interrupt_level(previousLevel);
+    return ret;
 }
 
 /*

@@ -83,7 +83,7 @@ miniport_create_unbound(int port_number)
 {
     miniport_t newUnboundPort;
 
-    if (port_number > MAXIMUM_BOUND || port_number < MINIMUM_UNBOUND)
+    if (port_number > MAXIMUM_UNBOUND || port_number < MINIMUM_UNBOUND)
     	return NULL;
 
     semaphore_P(unbound_semaphore);
@@ -95,7 +95,7 @@ miniport_create_unbound(int port_number)
     	return miniports[port_number];
     }
 
-    //Create a new port if not already existing
+    //Create a new unbound port if not already existing
     newUnboundPort = (miniport_t) malloc(sizeof(miniport));
 
     //Ensure port recreated properly
@@ -111,7 +111,7 @@ miniport_create_unbound(int port_number)
     	//Initialize data_available semaphore
 		semaphore_initialize(newUnboundPort->port_data.unbound.data_available, 0);
 
-    	//Store newPort into miniports array
+    	//Store new unbound port into miniports array
     	miniports[port_number] = newUnboundPort;
 
     	semaphore_V(unbound_semaphore);
@@ -144,6 +144,29 @@ miniport_create_bound(network_address_t addr, int remote_unbound_port_number)
 void
 miniport_destroy(miniport_t miniport)
 {
+	//Destroy miniport only if it exists
+	if (miniport != NULL)
+	{
+		semaphore_P(destroy_semaphore);
+
+		//Null array at port_number
+		miniports[miniport -> port_number] = NULL;
+
+		//If miniport is an unbound port, free the data it contains that we malloc
+		if ((miniport -> port_number) <= MAXIMUM_UNBOUND || (miniport -> port_number) >= MINIMUM_UNBOUND)
+		{
+			//Destroy the semaphore
+			semaphore_destroy(miniport->data.unbound.data_available);
+			//Free the queue for data queue
+			queue_free(miniport->port_data.unbound.data_queue);
+		}
+
+		//Free the miniport itself
+		free(miniport);
+
+		semaphore_V(destroy_semaphore);
+	}
+	return;
 }
 
 /* Sends a message through a locally bound port (the bound port already has an associated

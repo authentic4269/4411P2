@@ -2,17 +2,73 @@
  *  Implementation of minimsgs and miniports.
  */
 #include "minimsg.h"
+#include "queue.h"
+#include "synch.h"
+
+//Common Numbers
+#define MINIMUM_UNBOUND 0
+#define MAXIMUM_UNBOUND 32767
+#define MINIMUM_BOUND 32768
+#define MAXIMUM_BOUND 65535
 
 struct miniport
 {
-    int dummy; /* you should erase this field and replace it with your definition */
+   int port_number;
+
+   union 
+   {
+   		struct 
+   		{
+   			queue_t data_queue;
+   			semaphore_t data_available;
+   		} unbound;
+
+   		struct 
+   		{
+   			 network_address_t remote_address;
+   			 int remote_unbound_port_number;
+   		} bound;
+   } port_data;
 };
+
+//Array of miniports
+miniport_t* miniports;
+
+//Needed Semaphores
+semaphore_t bound_semaphore; //Controls access to bound miniports
+semaphore_t unbound_semaphore; //Controls access to unbound miniports
+semaphore_t destroy_semaphore; //Only allows one thread to destroy a port at a time
 
 /* performs any required initialization of the minimsg layer.
  */
 void
 minimsg_initialize()
 {
+	int currentPort = MINIMUM_UNBOUND;
+	int totalPorts = (MAXIMUM_BOUND - MINIMUM_UNBOUND + 1);
+
+	miniports = (miniport_t*) malloc(sizeof(miniport_t) * totalPorts);
+
+	if (miniports == NULL)
+		return;
+
+	while (currentPort < totalPorts)
+	{
+		miniports[currentPort] = NULL;
+		currentPort++;
+	}
+
+	//Initialize bound semaphore which controls access to bound miniports
+	bound_semaphore = semaphore_create();
+	semaphore_initialize(bound_semaphore, 1);
+
+	//Initialize unbound semaphore which controls access to unbound miniports
+	unbound_semaphore = semaphore_create();
+	semaphore_initialize(unbound_semaphore, 1);
+
+	//Initialize destroy semaphore which controls access to destroy miniports
+	destroy_semaphore = semaphore_create();
+	semaphore_initialize(destroy_semaphore, 1);
 }
 
 /* Creates an unbound port for listening. Multiple requests to create the same
@@ -25,7 +81,47 @@ minimsg_initialize()
 miniport_t
 miniport_create_unbound(int port_number)
 {
-    return 0;
+    miniport_t newUnboundPort;
+
+    if (port_number > MAXIMUM_BOUND || port_number < MINIMUM_UNBOUND)
+    	return NULL;
+
+    semaphore_P(unbound_semaphore);
+
+    //Return reference to any already existing ports
+    if (miniports[port_number] != NULL)
+    {
+    	semaphore_V(unbound_semaphore);
+    	return miniports[port_number];
+    }
+
+    //Create a new port if not already existing
+    newUnboundPort = (miniport_t) malloc(sizeof(miniport));
+
+    //Ensure port recreated properly
+    if (newUnboundPort != NULL)
+    {
+    	//Store port number
+    	newUnboundPort -> port_number = port_number;
+
+    	//Store unbound fields
+    	newUnboundPort -> port_data.unbound.data_queue = queue_new();
+    	newUnboundPort -> port_data.unbound.data_available = semaphore_create();
+
+    	//Initialize data_available semaphore
+		semaphore_initialize(newUnboundPort->port_data.unbound.data_available, 0);
+
+    	//Store newPort into miniports array
+    	miniports[port_number] = newUnboundPort;
+
+    	semaphore_V(unbound_semaphore);
+
+    	//Return miniport
+    	return miniports[port_number];
+    }
+    //else
+    semaphore_V(unbound_semaphore);
+    return NULL;
 }
 
 /* Creates a bound port for use in sending packets. The two parameters, addr and

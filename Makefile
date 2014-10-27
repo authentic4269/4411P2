@@ -34,6 +34,7 @@ OBJ =                              \
     random.o                       \
     alarm.o                        \
     queue.o                        \
+    network.o			   \
     synch.o                        \
     sortedlist.o                   \
     multilevel_queue.o 		   	

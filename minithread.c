@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "interrupts.h"
+#include "network.h"
 #include "minithread.h"
 #include "multilevel_queue.h"
 #include "queue.h"
@@ -145,7 +146,6 @@ minithread_fork(proc_t proc, arg_t arg) {
 
 minithread_t
 minithread_create(proc_t proc, arg_t arg) {
-	//Variable Initization
 	minithread_t newMinithread = (minithread_t) malloc(sizeof(struct minithread));
 	stack_pointer_t* stack_top = (stack_pointer_t*) malloc(sizeof(stack_pointer_t));
 	stack_pointer_t* stack_base = (stack_pointer_t*) malloc(sizeof(stack_pointer_t));
@@ -154,11 +154,9 @@ minithread_create(proc_t proc, arg_t arg) {
 
 	minithread_allocate_stack(stack_base, stack_top);
 
-	//Make sure the stack allocation properly set stack_base
 	if (*stack_base == NULL)
 		return NULL;
 
-	//Initialize the Minithread
 	newMinithread->proc = proc;
 	newMinithread->arg = arg;
 	newMinithread->level = 0;
@@ -238,15 +236,11 @@ minithread_yield() {
 		multilevel_queue_dequeue(multiqueue, start, (void **) &to_run);
 	}
 	
-	//Store last running thread
 	old_thread = runningThread;
-	//Store to_run thread as runningThread
 	runningThread = to_run;
 
-	//Add old thread to the end
 	multilevel_queue_enqueue(multiqueue, old_thread->level, (void *) old_thread);
 	
-	//Switch to next thread (to_run) from old thread (runningThread)
 	minithread_switch(old_thread->stack_top, to_run->stack_top);
 }
 
@@ -272,27 +266,20 @@ clock_handler(void* arg)
 
 	if (quantaRemaining <= 0)
 	{
-		//Retrieve to_run
 		multilevel_queue_dequeue(multiqueue, start, (void **) &to_run);
-
-		//Ensure to_run was retreived properly
 		if (to_run == NULL)
 		{
 			return;
 		}
 
-		//Store last running thread
 		old_thread = runningThread;
-		//Store to_run thread as runningThread
 		runningThread = to_run;
 		if (old_thread->level < 3)
 			old_thread->level++;
 		quantaRemaining = quantaAssignments[to_run->level];
 
-		//Add old thread to the end
 		multilevel_queue_enqueue(multiqueue, old_thread->level, (void *) old_thread);
 
-		//Switch to next thread (to_run) from old thread (runningThread)
 		minithread_switch(old_thread->stack_top, to_run->stack_top);
 	}
 	set_interrupt_level(ENABLED);
@@ -311,33 +298,28 @@ minithread_sleep_alarm_wakeup(void *arg)
 void 
 minithread_sleep_with_timeout(int delay)
 {
-	//Sleep semaphore
 	semaphore_t sleepSemaphore = semaphore_create();
 
-	//Holder for last interrupt level
 	interrupt_level_t previousLevel;
 
-	//Initialize sleep semaphore to a value of 0
 	semaphore_initialize(sleepSemaphore, 0);
 
-	//Disable interrupts
 	//Interrupts are disabled so that if we context switch away the alarm will
 	//not be triggered before semaphore_P is called and will not hang forever
 	previousLevel = set_interrupt_level(DISABLED);
 	printf("delay: %d\n", delay);
 
-	//Register the alarm
 	register_alarm(delay, &minithread_sleep_alarm_wakeup, sleepSemaphore); 
 
-	//Wait on sleep semaphore. 
- 	//semaphore_P calls minithread_yield, which re-enables interrupts
 	semaphore_P(sleepSemaphore);
 
-	//Free the sleep semaphore
 	semaphore_destroy(sleepSemaphore);
 
-	//Restore the previous interrupt level 
 	set_interrupt_level(previousLevel);
+}
+
+void network_handler(network_interrupt_arg_t *arg) {
+
 }
 
 /*
@@ -356,41 +338,31 @@ minithread_sleep_with_timeout(int delay)
  */
 void
 minithread_system_initialize(proc_t mainproc, arg_t mainarg) {
-	//Initialize mainThread
 	minithread_t mainThread = (minithread_t) malloc(sizeof(struct minithread));
 	
-	//Initialize idleThread
 	minithread_t idleThread;
 	
-	//Create alarms structure
 	alarms = new_sortedlist();
 
-	//Create cleanup semaphore
 	cleanupSemaphore = semaphore_create();
 	semaphore_initialize(cleanupSemaphore, 0);
 	
-	//Initialize time
 	currentTime = 0;
 
-	//Set Remaining Quanta to 0
 	quantaRemaining = 0;
 
-	//Make new multilevel_queue with 4 levels
 	multiqueue = multilevel_queue_new(4);
 
-	//Initialize finished threads queue
 	queue_finished_threads = queue_new();
 	
 	idleThread = minithread_create(placeholder, (arg_t) NULL);
 	queue_append(queue_finished_threads, idleThread);
 	mainThread = minithread_create(mainproc, mainarg);
 	
-	//Set global runningThread to be mainThread
 	runningThread = mainThread;
 
-//	minithread_fork(minithread_cleanup, NULL);
 
 	minithread_clock_init(QUANTA, clock_handler);
-
+	network_initialize(network_handler);
 	minithread_switch(idleThread->stack_top, mainThread->stack_top);	
 }

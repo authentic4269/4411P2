@@ -333,7 +333,7 @@ void network_handler(network_interrupt_arg_t *arg) {
 	}
 	
   	queue_append(incomingPort->port_data.unbound.data_queue, arg);
-	semaphore_P(incomingPort->port_data.unbound.data_available);
+	semaphore_V(incomingPort->port_data.unbound.data_available);
 }
 
 /*

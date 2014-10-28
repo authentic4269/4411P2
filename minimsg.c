@@ -215,7 +215,7 @@ minimsg_send(miniport_t local_unbound_port, miniport_t local_bound_port, minimsg
 		return 0;
 
 	//Make sure packet vaild size
-	if (len >= 0 && len <= MAXIMUM_MSG_SIZE)
+	if (len <= 0 || len >= MAXIMUM_MSG_SIZE)
 		return 0;
 
 	header = (mini_header_t) malloc(sizeof(struct mini_header));

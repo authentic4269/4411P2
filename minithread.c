@@ -323,8 +323,7 @@ minithread_sleep_with_timeout(int delay)
 void network_handler(network_interrupt_arg_t *arg) {
 	mini_header_t header;
 	miniport_t incomingPort;
-	
-	header = (mini_header_t) ((char*) arg->buffer + sizeof(struct routing_header));
+	header = (mini_header_t) arg->buffer; 
 	incomingPort = miniport_get_unbound(unpack_unsigned_short(header->destination_port));
 	if (incomingPort == NULL)
 	{

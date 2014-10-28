@@ -8,7 +8,6 @@
  *      the exact arguments in the prototypes.
  */
 #include "network.h"
-#include "minimsg.h"
 #include "miniheader.h"
 #include "queue.h"
 #include "synch.h"

@@ -1,3 +1,12 @@
+#include "minimsg.h"
+#include "miniheader.h"
+#include "interrupts.h"
+#include "queue.h"
+#include "synch.h"
+#include <stdlib.h>
+#include <stdio.h>
+
+
 /*
  *  Implementation of minimsgs and miniports.
  */
@@ -54,7 +63,7 @@ minimsg_initialize()
  * implementation of miniports, and for convenience. The caller needs to perform
  * a null check on the returned value. 
  */
-	miniport_t
+miniport_t
 miniport_get_unbound(int port_number) {
 	if (port_number > MAXIMUM_UNBOUND || port_number < MINIMUM_UNBOUND)
 		return NULL;
@@ -185,8 +194,9 @@ minimsg_send(miniport_t local_unbound_port, miniport_t local_bound_port, minimsg
 {
 	mini_header_t header;
 	network_address_t myaddr;
+	int ret;
+
 	network_get_my_address(myaddr);
-  int i;
 
 	if (local_bound_port == NULL || local_bound_port->type != 1)
 	{
@@ -200,19 +210,19 @@ minimsg_send(miniport_t local_unbound_port, miniport_t local_bound_port, minimsg
 		return -1;
 	}
 
-  //Ensure msg is valid
-  if (msg == NULL)
-    return 0;
+	//Ensure msg is valid
+	if (msg == NULL)
+		return 0;
 
-  //Make sure packet vaild size
-  if (len >= 0 && len <= MAXIMUM_MSG_SIZE)
-    return 0;
+	//Make sure packet vaild size
+	if (len >= 0 && len <= MAXIMUM_MSG_SIZE)
+		return 0;
 
 	header = (mini_header_t) malloc(sizeof(struct mini_header));
 
-  //Make sure header set up properly
-  if (header == NULL)
-    return 0;
+	//Make sure header set up properly
+	if (header == NULL)
+		return 0;
 
 	header->protocol = PROTOCOL_MINIDATAGRAM;
 
@@ -220,12 +230,12 @@ minimsg_send(miniport_t local_unbound_port, miniport_t local_bound_port, minimsg
 	pack_unsigned_short(header->source_port, local_unbound_port->port_number);
 	pack_address(header->destination_address, local_bound_port->port_data.bound.remote_addr);
 	pack_unsigned_short(header->destination_port, local_bound_port->port_data.bound.remote_port_number);
-	
-	int i = network_send_pkt(local_bound_port->port_data.bound.remote_addr, sizeof(struct mini_header), (char *) header, len, (char *) msg);  
 
-  free(header);
+	ret= network_send_pkt(local_bound_port->port_data.bound.remote_addr, sizeof(struct mini_header), (char *) header, len, (char *) msg);  
 
-  return i;
+	free(header);
+
+	return ret;
 }
 
 /* Receives a message through a locally unbound port. Threads that call this function are
@@ -238,87 +248,72 @@ minimsg_send(miniport_t local_unbound_port, miniport_t local_bound_port, minimsg
  */
 int minimsg_receive(miniport_t local_unbound_port, miniport_t* new_local_bound_port, minimsg_t msg, int *len)
 {
-  //Store header
-  mini_header_t header;
+	//Store header
+	mini_header_t header;
 
-  //Holds addresses
-  network_address_t source_addr;
-  network_address_t destination_addr;
-  network_address_t my_addr;
+	//Holds addresses
+	network_address_t source_addr;
+	network_address_t destination_addr;
+	network_address_t my_addr;
 
-  //Holds port numbers
-  int source_port_number;
-  int destination_port_number;
+	//Holds port numbers
+	int source_port_number;
+	int destination_port_number;
 
-  //Stores packet contents
-  int data_size;
-  char* data;
+	//Stores packet contents
+	int data_size;
+	char* data;
 
-  //Holds packet contents
-  network_interrupt_arg_t* incoming_data;
+	network_interrupt_arg_t* incoming_data;
 
-  //Used to hold current interrupt_level_t
-  interrupt_level_t previous_level;
+	if (local_unbound_port == NULL)
+		return 0;
 
-  if (local_unbound_port == NULL)
-    return 0;
+	if (msg == NULL)
+		return 0;
 
-  //Ensure msg is valid
-  if (msg == NULL)
-    return 0;
+	if (*len <= 0 || *len >= MAXIMUM_MSG_SIZE)
+		return 0;
 
-  //Make sure packet vaild size
-  if (*len >= 0 && *len <= MAXIMUM_MSG_SIZE)
-    return 0;
+	semaphore_P(local_unbound_port->port_data.unbound.data_available);
+	queue_dequeue(local_unbound_port->port_data.unbound.data_queue, (void**) &incoming_data);
 
-  //Wait for a packet arrival
-  previous_level = set_interrupt_level(DISABLED);
-  semaphore_P(local_unbound_port->port_data.unbound.data_available);
-  set_interrupt_level(previous_level);
+	header = (mini_header_t) ((char*) incoming_data->buffer + sizeof(struct mini_header));
 
-  //Dequeue item from queue
-  previous_level = set_interrupt_level(DISABLED);
-  queue_dequeue(local_unbound_port->port_data.unbound.data_queue, (void**) &incoming_data);
-  set_interrupt_level(previous_level);
+	source_port_number = (int) unpack_unsigned_short(header->source_port);
+	destination_port_number = (int) unpack_unsigned_short(header->destination_port);
+	unpack_address(header->source_address, source_addr);
+	unpack_address(header->destination_address, destination_addr);
 
-  //Get header
-  header = (mini_header_t) ((char*) incoming_data->buffer + sizeof(struct mini_header));
+	network_get_my_address(my_addr);
 
-  //Extract parameters from the header
-  source_port_number = (int) unpack_unsigned_short(header->source_port);
-  destination_port_number = (int) unpack_unsigned_short(header->destination_port);
-  unpack_address(header->source_address, source_addr);
-  unpack_address(header->destination_address, destination_addr);
+	//Ensure packet is going to a valid location and port
+	if (network_compare_network_addresses(my_addr, destination_addr) != 0 ||
+			(destination_port_number < MINIMUM_UNBOUND || destination_port_number > MAXIMUM_UNBOUND))
+	{
+		free(incoming_data);
+		return 0;
+	}
 
-  network_get_my_address(my_addr);
+	//Set data pointer to ((start of the packet) + (size of the header))
+	data = (char*) (incoming_data->buffer + sizeof(struct mini_header) + sizeof(struct mini_header));
 
-  //Ensure packet is going to proper location and correct port
-  if (network_address_same(my_addr, destination_addr) == 0 && 
-    (destination_port_number < MINIMUM_UNBOUND || destination_port_number > MAXIMUM_UNBOUND))
-  {
-    free(incoming_data);
-    return 0;
-  }
+	//Set data_size to ((size of the packet) - (size of the header))
+	data_size = incoming_data->size - sizeof(struct mini_header);
 
-  //Set data pointer to ((start of the packet) + (size of the header))
-  data = (char*) (incoming_data->buffer + sizeof(struct mini_header) + sizeof(struct mini_header));
+	//Set return value
+	if (*len > data_size)
+	{
+		*len = data_size;
+	}
 
-  //Set data_size to ((size of the packet) - (size of the header))
-  data_size = incoming_data->size - sizeof(struct mini_header);
+	//Set minimsg
+	memcpy(msg, data, *len);
 
-  //Set return value
-  if (*len > data_size)
-  {
-    *len = data_size;
-  }
+	//Create and set bound port targeting sender's address and listening port
+	*new_local_bound_port = miniport_create_bound(source_addr, source_port_number);
 
-  //Set minimsg
-  memcpy(msg, data, *len);
-
-  //Create and set bound port targeting sender's address and listening port
-  *new_local_bound_port = miniport_create_bound(source_addr, source_port_number);
-
-  free(incoming_data);
+	free(incoming_data);
 
 	return *len;
 }

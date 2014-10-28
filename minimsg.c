@@ -13,7 +13,7 @@
 
 struct miniport
 {
-	short int port_number;
+	unsigned short int port_number;
 	// type == 0 if unbound, == 1 if bound
 	int type;
 
@@ -165,6 +165,7 @@ miniport_destroy(miniport_t miniport)
 	{
 		semaphore_P(destroy_semaphore);
 
+		//NULL array at port_number
 		miniports[miniport -> port_number] = NULL;
 
 		//If miniport is an unbound port, free the data it contains that we malloc

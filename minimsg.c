@@ -165,6 +165,7 @@ miniport_destroy(miniport_t miniport)
 	{
 		semaphore_P(destroy_semaphore);
 
+		//NULL array at port_number
 		miniports[miniport -> port_number] = NULL;
 
 		//If miniport is an unbound port, free the data it contains that we malloc

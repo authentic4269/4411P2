@@ -127,29 +127,47 @@ miniport_create_unbound(int port_number)
 	miniport_t
 miniport_create_bound(network_address_t addr, int remote_unbound_port_number)
 {
-	miniport_t newPort;
-	semaphore_P(bound_semaphore);
-	newPort = (miniport_t) malloc(sizeof(struct miniport));
-	if (nextBoundPort >= MAXIMUM_BOUND)
-	{
-		nextBoundPort = MINIMUM_BOUND;
-	}
+  miniport_t newPort;
+  int totalBoundPorts = MAXIMUM_BOUND - MINIMUM_BOUND + 1;
+  int convertedPortNumber = (((nextBoundPort - MINIMUM_BOUND)) % totalBoundPorts) + totalBoundPorts;
+  int i = 1;
 
-	if (newPort != NULL)
-	{
-		newPort->port_number = nextBoundPort;
-		newPort->type = 1;
-		newPort->port_data.bound.remote_port_number = remote_unbound_port_number;
-		network_address_copy(addr, newPort->port_data.bound.remote_addr);
-		miniports[nextBoundPort++] = newPort;
-		semaphore_V(bound_semaphore);
+  semaphore_P(bound_semaphore);
 
-		return newPort;
-	}
-	else {
-		semaphore_V(bound_semaphore);
-		return NULL;
-	}
+  //Find next available port
+  while (i < totalBoundPorts && (miniports[convertedPortNumber] != NULL))
+  {
+    convertedPortNumber = (((nextBoundPort - MINIMUM_BOUND)+i) % totalBoundPorts) + totalBoundPorts;
+    i++;
+  }
+
+  if (miniports[convertedPortNumber] == NULL)
+  {
+    newPort = (miniport_t) malloc(sizeof(struct miniport));
+
+    if (newPort != NULL)
+    {
+      nextBoundPort = convertedPortNumber;
+
+      //Initialize newPort
+      newPort->port_number = nextBoundPort;
+      newPort->type = 1;
+      newPort->port_data.bound.remote_port_number = remote_unbound_port_number;
+      network_address_copy(addr, port->port_data.bound.remote_addr);
+
+      miniports[nextBoundPort] = newPort;
+
+      nextBoundPort++;
+
+      semaphore_V(bound_semaphore);
+
+      return miniports[(nextBoundPort--)];
+    }
+  }
+
+  semaphore_V(bound_semaphore);
+  
+  return NULL;
 }
 
 /* Destroys a miniport and frees up its resources. If the miniport was in use at

@@ -2,8 +2,11 @@
  *  Implementation of minimsgs and miniports.
  */
 #include "minimsg.h"
+#include "miniheader.h"
 #include "queue.h"
 #include "synch.h"
+#include <stdlib.h>
+#include <stdio.h>
 
 //Common Numbers
 #define MINIMUM_UNBOUND 0
@@ -95,7 +98,7 @@ miniport_create_unbound(int port_number)
 		return miniports[port_number];
 	}
 
-	newUnboundPort = (miniport_t) malloc(sizeof(miniport));
+	newUnboundPort = (miniport_t) malloc(sizeof(struct miniport));
 
 	if (newUnboundPort != NULL)
 	{
@@ -129,22 +132,23 @@ miniport_create_bound(network_address_t addr, int remote_unbound_port_number)
 {
 	miniport_t newPort;
 	semaphore_P(bound_semaphore);
-
-	if (nextBoundPort > MAXIMUM_BOUND)
+	if (nextBoundPort >= MAXIMUM_BOUND)
 	{
 		nextBoundPort = MINIMUM_BOUND;
 	}
 
-	newPort = (miniport_t) malloc(sizeof(miniport));
+	newPort = (miniport_t) malloc(sizeof(struct miniport));
 
 	if (newPort != NULL)
 	{
-		newPort ->remote_port_number = remote_unbound_port_number;
-		newPort ->remote_addr = addr;
-		newPort -> type = 1;
+		newPort->port_data.bound.remote_port_number = remote_unbound_port_number;
+		// this is a hack, because array pointers are constant	
+		newPort->port_data.bound.remote_addr[0] = addr[0];
+		newPort->port_data.bound.remote_addr[1] = addr[1];
+		newPort->type = 1;
 
 
-		miniports[nextBoundPort] = newPort;
+		miniports[nextBoundPort++] = newPort;
 
 		semaphore_V(bound_semaphore);
 
@@ -171,7 +175,7 @@ miniport_destroy(miniport_t miniport)
 		//If miniport is an unbound port, free the data it contains that we malloc
 		if (miniport->type == 0)
 		{
-			semaphore_destroy(miniport->data.unbound.data_available);
+			semaphore_destroy(miniport->port_data.unbound.data_available);
 			queue_free(miniport->port_data.unbound.data_queue);
 		}
 		free(miniport);
@@ -193,10 +197,6 @@ miniport_destroy(miniport_t miniport)
 	int
 minimsg_send(miniport_t local_unbound_port, miniport_t local_bound_port, minimsg_t msg, int len)
 {
-	char *srcbuf;
-	char *dstbuf;
-	char *srcportbuf;
-	char *dstportbuf;
 	mini_header_t header;
 	network_address_t myaddr;
 	network_get_my_address(myaddr);
@@ -212,17 +212,12 @@ minimsg_send(miniport_t local_unbound_port, miniport_t local_bound_port, minimsg
 	}
 	header = (mini_header_t) malloc(sizeof(struct mini_header));
 	header->protocol = PROTOCOL_MINIDATAGRAM;
-	srcbuf = (char *) malloc(8);
-	pack_address(srcbuf, myaddr);
-	pack_unsigned_short(srcportbuf, local_unbound_port->port_number);
-	pack_address(dstbuf, local_bound_port->remote_addr);
-	pack_unsigned_short(dstportbuf, local_bound_port->remote_port);
-	header->source_address = srcbuf;
-	header->source_port = srcportbuf;
-	header->destination_address = dstbuf;
-	header->destination_port = dstportbuf;
+	pack_address(header->source_address, myaddr);
+	pack_unsigned_short(header->source_port, local_unbound_port->port_number);
+	pack_address(header->destination_address, local_bound_port->port_data.bound.remote_addr);
+	pack_unsigned_short(header->destination_port, local_bound_port->port_data.bound.remote_port_number);
 	
-	return network_send_pkt(local_bound_port->remote_addr, sizeof(struct mini_header), (char *) header, len, (char *) msg);  
+	return network_send_pkt(local_bound_port->port_data.bound.remote_addr, sizeof(struct mini_header), (char *) header, len, (char *) msg);  
 }
 
 /* Receives a message through a locally unbound port. Threads that call this function are

@@ -282,7 +282,7 @@ int minimsg_receive(miniport_t local_unbound_port, miniport_t* new_local_bound_p
   set_interrupt_level(previous_level);
 
   //Get header
-  header = (mini_header_t) ((char*) incoming_data->buffer + sizeof(struct header));
+  header = (mini_header_t) ((char*) incoming_data->buffer + sizeof(struct mini_header));
 
   //Extract parameters from the header
   source_port_number = (int) unpack_unsigned_short(header->source_port);
@@ -301,7 +301,7 @@ int minimsg_receive(miniport_t local_unbound_port, miniport_t* new_local_bound_p
   }
 
   //Set data pointer to ((start of the packet) + (size of the header))
-  data = (char*) (incoming_data->buffer + sizeof(struct header) + sizeof(struct mini_header));
+  data = (char*) (incoming_data->buffer + sizeof(struct mini_header) + sizeof(struct mini_header));
 
   //Set data_size to ((size of the packet) - (size of the header))
   data_size = incoming_data->size - sizeof(struct mini_header);

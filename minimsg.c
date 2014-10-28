@@ -21,7 +21,7 @@
 
 miniport_t* miniports;
 
-int nextBoundPort;
+int nextBoundPort = MINIMUM_BOUND;
 
 // Mutexes for creation of bound/unbound miniports, and destruction of any miniport_t
 semaphore_t bound_semaphore; 
@@ -110,8 +110,10 @@ miniport_create_unbound(int port_number)
 
 		return newUnboundPort;
 	}
+
 	semaphore_V(unbound_semaphore);
-	return NULL;
+	
+  return NULL;
 }
 
 /* Creates a bound port for use in sending packets. The two parameters, addr and
@@ -126,31 +128,46 @@ miniport_create_unbound(int port_number)
 miniport_create_bound(network_address_t addr, int remote_unbound_port_number)
 {
 	miniport_t newPort;
+  int totalBoundPorts = MAXIMUM_BOUND - MINIMUM_BOUND + 1;
+  int convertedPortNumber = (((nextBoundPort - MINIMUM_BOUND)) % totalBoundPorts) + totalBoundPorts;
+  int i = 1;
+
 	semaphore_P(bound_semaphore);
-	if (nextBoundPort >= MAXIMUM_BOUND)
-	{
-		nextBoundPort = MINIMUM_BOUND;
-	}
 
-	newPort = (miniport_t) malloc(sizeof(struct miniport));
+  //Find next available port
+  while (i < totalBoundPorts && (miniports[convertedPortNumber] != NULL))
+  {
+    convertedPortNumber = (((nextBoundPort - MINIMUM_BOUND)+i) % totalBoundPorts) + totalBoundPorts;
+    i++;
+  }
 
-	if (newPort != NULL)
-	{
-		newPort->port_data.bound.remote_port_number = remote_unbound_port_number;
-		// this is a hack, because array pointers are constant	
-		newPort->port_data.bound.remote_addr[0] = addr[0];
-		newPort->port_data.bound.remote_addr[1] = addr[1];
-		newPort->type = 1;
+  if (miniports[convertedPortNumber] == NULL)
+  {
+  	newPort = (miniport_t) malloc(sizeof(struct miniport));
 
+  	if (newPort != NULL)
+  	{
+      nextBoundPort = convertedPortNumber;
 
-		miniports[nextBoundPort++] = newPort;
+      //Initialize newPort
+      newPort->port_number = nextBoundPort;
+      newPort->type = 1;
+  		newPort->port_data.bound.remote_port_number = remote_unbound_port_number;
+      network_address_copy(addr, port->port_data.bound.remote_addr);
 
-		semaphore_V(bound_semaphore);
+  		miniports[nextBoundPort] = newPort;
 
-		return newPort;
-	}
+      nextBoundPort++;
+
+  		semaphore_V(bound_semaphore);
+
+  		return miniports[(nextBoundPort--)];
+  	}
+  }
+
 	semaphore_V(bound_semaphore);
-	return NULL;
+	
+  return NULL;
 }
 
 /* Destroys a miniport and frees up its resources. If the miniport was in use at
@@ -173,6 +190,7 @@ miniport_destroy(miniport_t miniport)
 			semaphore_destroy(miniport->port_data.unbound.data_available);
 			queue_free(miniport->port_data.unbound.data_queue);
 		}
+
 		free(miniport);
 
 		semaphore_V(destroy_semaphore);

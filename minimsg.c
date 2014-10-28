@@ -152,7 +152,7 @@ miniport_create_bound(network_address_t addr, int remote_unbound_port_number)
       newPort->port_number = nextBoundPort;
       newPort->type = 1;
       newPort->port_data.bound.remote_port_number = remote_unbound_port_number;
-      network_address_copy(addr, port->port_data.bound.remote_addr);
+      network_address_copy(addr, newPort->port_data.bound.remote_addr);
 
       miniports[nextBoundPort] = newPort;
 

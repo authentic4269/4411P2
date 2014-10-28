@@ -13,9 +13,9 @@
 
 struct miniport
 {
-	short int port_number;
+	unsigned short port_number;
 	// type == 0 if unbound, == 1 if bound
-	int type;
+	short type;
 
 	union 
 	{
@@ -28,7 +28,7 @@ struct miniport
 		struct 
 		{
 			network_address_t remote_addr;
-			int remote__port_number;
+			unsigned int remote_port_number;
 		} bound;
 	} port_data;
 };
@@ -72,7 +72,7 @@ minimsg_initialize()
 	semaphore_initialize(destroy_semaphore, 1);
 }
 
-/* Creates an unbound port for listening. Multiple requests to create the same
+/* Creates an unound port for listening. Multiple requests to create the same
  * unbound port should return the same miniport reference. It is the responsibility
  * of the programmer to make sure he does not destroy unbound miniports while they
  * are still in use by other threads -- this would result in undefined behavior.
@@ -192,7 +192,36 @@ miniport_destroy(miniport_t miniport)
 	int
 minimsg_send(miniport_t local_unbound_port, miniport_t local_bound_port, minimsg_t msg, int len)
 {
-	return 0;
+	char *srcbuf;
+	char *dstbuf;
+	char *srcportbuf;
+	char *dstportbuf;
+	mini_header_t header;
+	network_address_t myaddr;
+	network_get_my_address(myaddr);
+	if (local_bound_port == NULL || local_bound_port->type != 1)
+	{
+		printf("err in minimsg_send\n");
+		return -1;
+	}
+	if (local_unbound_port == NULL || local_unbound_port->type != 0)
+	{
+		printf("err in minimsg_send\n");
+		return -1;
+	}
+	header = (mini_header_t) malloc(sizeof(struct mini_header));
+	header->protocol = PROTOCOL_MINIDATAGRAM;
+	srcbuf = (char *) malloc(8);
+	pack_address(srcbuf, myaddr);
+	pack_unsigned_short(srcportbuf, local_unbound_port->port_number);
+	pack_address(dstbuf, local_bound_port->remote_addr);
+	pack_unsigned_short(dstportbuf, local_bound_port->remote_port);
+	header->source_address = srcbuf;
+	header->source_port = srcportbuf;
+	header->destination_address = dstbuf;
+	header->destination_port = dstportbuf;
+	
+	return network_send_pkt(local_bound_port->remote_addr, sizeof(struct mini_header), (char *) header, len, (char *) msg);  
 }
 
 /* Receives a message through a locally unbound port. Threads that call this function are

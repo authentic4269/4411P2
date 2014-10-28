@@ -8,11 +8,41 @@
  *      the exact arguments in the prototypes.
  */
 #include "network.h"
+#include "minimsg.h"
+#include "miniheader.h"
+#include "queue.h"
+#include "synch.h"
+#include <stdlib.h>
+#include <stdio.h>
+
 
 /* The maximum size of a minimsg.
  * Must be <= MAX_NETWORK_PKT_SIZE - NETWORK_HDR_SIZE
  */
 #define MINIMSG_MAX_MSG_SIZE (4096)
+
+struct miniport
+{
+	unsigned short port_number;
+	// type == 0 if unbound, == 1 if bound
+	short type;
+
+	union 
+	{
+		struct 
+		{
+			queue_t data_queue;
+			semaphore_t data_available;
+		} unbound;
+
+		struct 
+		{
+			network_address_t remote_addr;
+			unsigned int remote_port_number;
+		} bound;
+	} port_data;
+};
+
 
 typedef struct miniport* miniport_t;
 typedef char* minimsg_t;
@@ -64,5 +94,10 @@ extern int minimsg_send(miniport_t local_unbound_port, miniport_t local_bound_po
  * of this function is the number of data payload bytes received not inclusive of the header.
  */
 extern int minimsg_receive(miniport_t local_unbound_port, miniport_t* new_local_bound_port, minimsg_t msg, int *len);
+
+/*
+ * Gets the unbound miniport associated with port_number. null if it is uninitialized or if port_number out of range. 
+ */
+extern miniport_t miniport_get_unbound(int port_number);
 
 #endif /*__MINIMSG_H__*/

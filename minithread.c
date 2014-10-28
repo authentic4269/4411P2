@@ -11,6 +11,8 @@
 #include <stdio.h>
 #include "interrupts.h"
 #include "network.h"
+#include "minimsg.h"
+#include "miniheader.h"
 #include "minithread.h"
 #include "multilevel_queue.h"
 #include "queue.h"
@@ -319,7 +321,20 @@ minithread_sleep_with_timeout(int delay)
 }
 
 void network_handler(network_interrupt_arg_t *arg) {
-
+	mini_header_t header;
+	miniport_t incomingPort;
+	
+	header = (mini_header_t) ((char*) arg->buffer + sizeof(struct routing_header));
+	incomingPort = miniport_get_unbound(unpack_unsigned_short(header->destination_port));
+	if (incomingPort == NULL)
+	{
+		// Nobody was waiting to receive the packet
+		printf("packet dropped like it's hot\n");
+		return;
+	}
+	
+  	queue_append(incomingPort->port_data.unbound.data_queue, arg);
+	semaphore_P(incomingPort->port_data.unbound.data_available);
 }
 
 /*
@@ -363,6 +378,7 @@ minithread_system_initialize(proc_t mainproc, arg_t mainarg) {
 
 
 	minithread_clock_init(QUANTA, clock_handler);
+	minimsg_initialize();
 	network_initialize(network_handler);
 	minithread_switch(idleThread->stack_top, mainThread->stack_top);	
 }

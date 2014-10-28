@@ -1,12 +1,6 @@
 /*
  *  Implementation of minimsgs and miniports.
  */
-#include "minimsg.h"
-#include "miniheader.h"
-#include "queue.h"
-#include "synch.h"
-#include <stdlib.h>
-#include <stdio.h>
 
 //Common Numbers
 #define MINIMUM_UNBOUND 0
@@ -15,28 +9,6 @@
 #define MAXIMUM_BOUND 65535
 
 #define MAXIMUM_MSG_SIZE (4096)
-
-struct miniport
-{
-	unsigned short port_number;
-	// type == 0 if unbound, == 1 if bound
-	short type;
-
-	union 
-	{
-		struct 
-		{
-			queue_t data_queue;
-			semaphore_t data_available;
-		} unbound;
-
-		struct 
-		{
-			network_address_t remote_addr;
-			unsigned int remote_port_number;
-		} bound;
-	} port_data;
-};
 
 miniport_t* miniports;
 
@@ -75,6 +47,18 @@ minimsg_initialize()
 
 	destroy_semaphore = semaphore_create();
 	semaphore_initialize(destroy_semaphore, 1);
+}
+
+/*
+ * Gets a miniport by port_number. Its here so that we don't rely on an array
+ * implementation of miniports, and for convenience. The caller needs to perform
+ * a null check on the returned value. 
+ */
+	miniport_t
+miniport_get_unbound(int port_number) {
+	if (port_number > MAXIMUM_UNBOUND || port_number < MINIMUM_UNBOUND)
+		return NULL;
+	return miniports[port_number];
 }
 
 /* Creates an unbound port for listening. Multiple requests to create the same

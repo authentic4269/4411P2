@@ -233,6 +233,7 @@ minimsg_send(miniport_t local_unbound_port, miniport_t local_bound_port, minimsg
 	pack_address(header->source_address, myaddr);
 	pack_unsigned_short(header->source_port, local_unbound_port->port_number);
 	pack_address(header->destination_address, local_bound_port->port_data.bound.remote_addr);
+	printf("sending to port: %d", local_bound_port->port_data.bound.remote_port_number);
 	pack_unsigned_short(header->destination_port, local_bound_port->port_data.bound.remote_port_number);
 
 	ret= network_send_pkt(local_bound_port->port_data.bound.remote_addr, sizeof(struct mini_header), (char *) header, len, (char *) msg);  

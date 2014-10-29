@@ -128,35 +128,35 @@ miniport_create_unbound(int port_number)
 miniport_create_bound(network_address_t addr, int remote_unbound_port_number)
 {
 	miniport_t newPort;
-	int totalBoundPorts;
-	int convertedPort;
-	int i;
+	int totalBoundPorts = MAXIMUM_BOUND - MINIMUM_BOUND + 1;
+	int convertedPortNumber = (((nextBoundPort - MINIMUM_BOUND)) % totalBoundPorts) + totalBoundPorts;
+	int i = 1;
+
 	semaphore_P(bound_semaphore);
 
-	totalBoundPorts = (MAXIMUM_BOUND - MINIMUM_BOUND) + 1;
-	convertedPort = (nextBoundPort % totalBoundPorts) + MINIMUM_BOUND;
-	for (i = 1; i < totalBoundPorts && (miniports[convertedPort] != NULL); i++)
-		convertedPort = (nextBoundPort % totalBoundPorts) + MINIMUM_BOUND + i;
+	while (i < totalBoundPorts && (miniports[convertedPortNumber] != NULL))
+	{
+		convertedPortNumber = (((nextBoundPort - MINIMUM_BOUND)+i) % totalBoundPorts) + totalBoundPorts;
+		i++;
+	}
 
-
-	if (miniports[convertedPort] == NULL)
+	if (miniports[convertedPortNumber] == NULL)
 	{
 		newPort = (miniport_t) malloc(sizeof(struct miniport));
+
 		if (newPort != NULL)
 		{
+			newPort->port_number = convertedPortNumber;
+			newPort->type = 1;
 			newPort->port_data.bound.remote_port_number = remote_unbound_port_number;
 			network_address_copy(addr, newPort->port_data.bound.remote_addr);
-			newPort->type = 1;
-
-
-			miniports[convertedPort] = newPort;
-			nextBoundPort = convertedPort;
-
+			miniports[convertedPortNumber] = newPort;
+			nextBoundPort = convertedPortNumber + 1;
 			semaphore_V(bound_semaphore);
-
 			return newPort;
 		}
 	}
+
 	semaphore_V(bound_semaphore);
 	return NULL;
 }
@@ -167,10 +167,12 @@ miniport_create_bound(network_address_t addr, int remote_unbound_port_number)
 	void
 miniport_destroy(miniport_t miniport)
 {
+	//Destroy miniport only if it exists
 	if (miniport != NULL)
 	{
 		semaphore_P(destroy_semaphore);
 
+		//NULL array at port_number
 		miniports[miniport -> port_number] = NULL;
 
 		//If miniport is an unbound port, free the data it contains that we malloc
@@ -220,7 +222,7 @@ minimsg_send(miniport_t local_unbound_port, miniport_t local_bound_port, minimsg
 	if (msg == NULL)
 		return 0;
 
-	if (len <= 0 || len >= MAXIMUM_MSG_SIZE)
+	if (len < 0 || len > MAXIMUM_MSG_SIZE)
 		return 0;
 
 	header = (mini_header_t) malloc(sizeof(struct mini_header));
@@ -233,7 +235,6 @@ minimsg_send(miniport_t local_unbound_port, miniport_t local_bound_port, minimsg
 	pack_address(header->source_address, myaddr);
 	pack_unsigned_short(header->source_port, local_unbound_port->port_number);
 	pack_address(header->destination_address, local_bound_port->port_data.bound.remote_addr);
-	printf("sending to port: %d", local_bound_port->port_data.bound.remote_port_number);
 	pack_unsigned_short(header->destination_port, local_bound_port->port_data.bound.remote_port_number);
 
 	ret= network_send_pkt(local_bound_port->port_data.bound.remote_addr, sizeof(struct mini_header), (char *) header, len, (char *) msg);  
@@ -253,15 +254,19 @@ minimsg_send(miniport_t local_unbound_port, miniport_t local_bound_port, minimsg
  */
 int minimsg_receive(miniport_t local_unbound_port, miniport_t* new_local_bound_port, minimsg_t msg, int *len)
 {
+	//Store header
 	mini_header_t header;
 
+	//Holds addresses
 	network_address_t source_addr;
 	network_address_t destination_addr;
 	network_address_t my_addr;
 
+	//Holds port numbers
 	int source_port_number;
 	int destination_port_number;
 
+	//Stores packet contents
 	int data_size;
 	char* data;
 
@@ -296,17 +301,22 @@ int minimsg_receive(miniport_t local_unbound_port, miniport_t* new_local_bound_p
 		return 0;
 	}
 
+	//Set data pointer to ((start of the packet) + (size of the header))
 	data = (char*) (incoming_data->buffer + sizeof(struct mini_header));
 
+	//Set data_size to ((size of the packet) - (size of the header))
 	data_size = incoming_data->size - sizeof(struct mini_header);
 
+	//Set return value
 	if (*len > data_size)
 	{
 		*len = data_size;
 	}
 
+	//Set minimsg
 	memcpy(msg, data, *len);
 
+	//Create and set bound port targeting sender's address and listening port
 	*new_local_bound_port = miniport_create_bound(source_addr, source_port_number);
 
 	free(incoming_data);

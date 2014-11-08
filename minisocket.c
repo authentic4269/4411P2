@@ -265,7 +265,25 @@ minisocket_t minisocket_server_create(int port, minisocket_error *error)
  */
 minisocket_t minisocket_client_create(network_address_t addr, int port, minisocket_error *error)
 {
+	minisocket_t newMinisocket;
 
+	if (error == NULL)
+		return NULL;
+
+	semaphore_P(client_semaphore);
+
+	newMinisocket = minisocket_create_socket(newMinisocket);
+	if (newMinisocket == NULL)
+	{
+		*error = SOCKET_OUTOFMEMORY;
+		semaphore_V(server_semaphore);
+		return NULL;
+	}
+
+	semaphore_V(client_semaphore);
+
+	*error = SOCKET_NOERROR;
+	return newMinisocket;
 }
 
 

@@ -29,7 +29,7 @@ struct minisocket
 	char waiting;
 
 	//Semaphore to wait for an ACK
-	semaphore_t wait_for_ack_sem;
+	semaphore_t wait_for_ack_semaphore;
 
 	int seq_num;
 	int ack_num;
@@ -41,8 +41,7 @@ struct minisocket
 	//Synchronizes access to parts of the socket
 	semaphore_t mutex;
 
-	//Threads waiting on the mutex
-	int num_waiting_on_mutex;
+	int threads_waiting_on_mutex;
 
 	//Destination host's information
 	network_address_t destination_addr;
@@ -95,6 +94,85 @@ void minisocket_initialize()
 	minithread_fork((proc_t) &delete_sockets, (void*) NULL);
 }
 
+/*
+ * Creates a socket 
+ * The argument "port" is the port number of the created socket
+ */
+minisocket_t minisocket_create_socket(int port)
+{
+	minisocket_t newMinisocket;
+
+	newMinisocket = (minisocket_t) malloc(sizeof(struct minisocket));
+
+	if (newMinisocket == NULL)
+		return NULL;
+
+	//Semaphore to wait for an ACK
+	semaphore_t wait_for_ack_sem;
+
+	//Synchronizes access to parts of the socket
+	semaphore_t mutex;
+
+	//Threads waiting on the mutex
+	int num_waiting_on_mutex;
+
+	//Destination host's information
+	network_address_t destination_addr;
+	int dst_port;
+
+	//Alerts the thread of waiting packets
+	semaphore_t packet_ready;
+
+	newMinisocket->port_number = port;
+	newMinisocket->status = ;
+	newMinisocket->waiting = ;
+	newMinisocket->seq_num = 0;
+	newMinisocket->ack_num = 0;
+	newMinisocket->data_buffer = NULL;
+	newMinisocket->data_len = 0;
+	newMinisocket->threads_waiting_on_mutex = 0;
+	newMinisocket->timeout = 100;
+
+	newMinisocket->wait_for_ack_semaphore = semaphore_create();
+	if (newMinisocket->wait_for_ack_semaphore == NULL)
+	{
+		free(newMinisocket);
+		return NULL;
+	}
+	semaphore_initialize(newMinisocket->wait_for_ack_semaphore, 0);
+
+	newMinisocket->mutex = semaphore_create();
+	if (newMinisocket->mutex == NULL)
+	{
+		free(newMinisocket->wait_for_ack_semaphore);
+		free(newMinisocket);
+		return NULL;
+	}
+	semaphore_initialize(newMinisocket->mutex, 1);
+
+	newMinisocket->packet_ready = semaphore_create();
+	if (newMinisocket->packet_ready == NULL)
+	{
+		free(newMinisocket->mutex);
+		free(newMinisocket->wait_for_ack_semaphore);
+		free(newMinisocket);
+		return NULL;
+	}
+	semaphore_initialize(newMinisocket->packet_ready, 0);
+
+	newMinisocket->waiting_packets = queue_new();
+	if (newMinisocket->waiting_packets == NULL)
+	{
+		free(newMinisocket->packet_ready);
+		free(newMinisocket->mutex);
+		free(newMinisocket->wait_for_ack_semaphore);
+		free(newMinisocket);
+		return NULL;
+	}
+
+	return newMinisocket;
+}
+
 /* 
  * Listen for a connection from somebody else. When communication link is
  * created return a minisocket_t through which the communication can be made
@@ -108,7 +186,29 @@ void minisocket_initialize()
  */
 minisocket_t minisocket_server_create(int port, minisocket_error *error)
 {
+	/*
+	minisocket_t minisocket;
 
+	if (error == NULL)
+		return NULL;
+
+	if (port < TCP_MINIMUM_SERVER || port > TCP_MAXIMUM_SERVER)
+	{
+		*error = SOCKET_INVALIDPARAMS;
+		return NULL;
+	}
+
+	semaphore_P(server_semaphore);
+
+	if (minisockets[port] != NULL)
+	{
+		*error = SOCKET_PORTINUSE;
+		semaphore_V(server_semaphore);
+		return NULL;
+	}
+
+	minisocket = 
+	*/
 }
 
 

@@ -30,6 +30,14 @@ enum minisocket_error {
   SOCKET_OUTOFMEMORY    /* function could not complete because of insufficient memory */
 };
 
+enum minisocket_statuses { 
+	TCP_PORT_LISTENING = 1, 
+	TCP_PORT_CONNECTING,
+	TCP_PORT_CONNECTED,
+	TCP_PORT_CLOSING,
+	TCP_PORT_UNABLE_TO_CONNECT
+};
+
 /* Initializes the minisocket layer. */
 void minisocket_initialize();
 

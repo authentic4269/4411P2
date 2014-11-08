@@ -26,17 +26,16 @@ struct minisocket
 	int port_number;
 
 	char status;
-	char waiting;
 
 	//Semaphore to wait for an ACK
 	semaphore_t wait_for_ack_semaphore;
 
-	int seq_num;
-	int ack_num;
+	int seq_number;
+	int ack_number;
 
 	//Stores the data
 	char* data_buffer;
-	int data_len;
+	int data_length;
 
 	//Synchronizes access to parts of the socket
 	semaphore_t mutex;
@@ -45,7 +44,7 @@ struct minisocket
 
 	//Destination host's information
 	network_address_t destination_addr;
-	int dst_port;
+	int destination_port;
 
 	//Alerts the thread of waiting packets
 	queue_t waiting_packets;
@@ -124,12 +123,11 @@ minisocket_t minisocket_create_socket(int port)
 	semaphore_t packet_ready;
 
 	newMinisocket->port_number = port;
-	newMinisocket->status = ;
-	newMinisocket->waiting = ;
-	newMinisocket->seq_num = 0;
-	newMinisocket->ack_num = 0;
+	newMinisocket->status = TCP_PORT_LISTENING;
+	newMinisocket->seq_number = 0;
+	newMinisocket->ack_number = 0;
 	newMinisocket->data_buffer = NULL;
-	newMinisocket->data_len = 0;
+	newMinisocket->data_length = 0;
 	newMinisocket->threads_waiting_on_mutex = 0;
 	newMinisocket->timeout = 100;
 
@@ -186,8 +184,8 @@ minisocket_t minisocket_create_socket(int port)
  */
 minisocket_t minisocket_server_create(int port, minisocket_error *error)
 {
-	/*
-	minisocket_t minisocket;
+	minisocket_t newMinisocket;
+	int connected = 1;
 
 	if (error == NULL)
 		return NULL;
@@ -200,6 +198,7 @@ minisocket_t minisocket_server_create(int port, minisocket_error *error)
 
 	semaphore_P(server_semaphore);
 
+	//Checks if port already exists
 	if (minisockets[port] != NULL)
 	{
 		*error = SOCKET_PORTINUSE;
@@ -207,8 +206,46 @@ minisocket_t minisocket_server_create(int port, minisocket_error *error)
 		return NULL;
 	}
 
-	minisocket = 
-	*/
+	newMinisocket = minisocket_create_socket(newMinisocket);
+	if (newMinisocket == NULL)
+	{
+		*error = SOCKET_OUTOFMEMORY;
+		semaphore_V(server_semaphore);
+		return NULL;
+	}
+
+	newMinisocket->port_type = TCP_PORT_TYPE_SERVER;
+	minisockets[port] = newMinisocket;
+
+	semaphore_V(server_semaphore);
+
+	while (connected == 1)
+	{
+		semaphore_P(newMinisocket->wait_for_ack_semaphore);
+
+		newMinisocket->status = TCP_PORT_CONNECTING;
+
+		newMinisocket->ack_number++;
+		ack_check = transmit_packet(newMinisocket, newMinisocket->destination_addr, 
+			newMinisocket->destination_port, 1, MSG_SYNACK, 0, NULL, error);
+
+		if (ack_check == -1)
+		{
+			newMinisocket->status = TCP_PORT_LISTENING;
+			newMinisocket->ack_number--;
+			newMinisocket->seq_number--;
+			newtwork_address_blankify(newMinisocket->destination_addr);
+			newMinisocket->destination_port = 0;
+		}	
+		else
+		{
+			newMinisocket->status = TCP_PORT_CONNECTED;
+			connected = 0;
+		}
+	}
+
+	*error = SOCKET_NOERROR;
+	return newMinisocket;
 }
 
 

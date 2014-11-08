@@ -3,16 +3,96 @@
  */
 #include "minisocket.h"
 
+#define TCP_PORT_TYPE_SERVER 0
+#define TCP_PORT_TYPE_CLIENT 1
+
+#define TCP_MINIMUM_SERVER 0
+#define TCP_MAXIMUM_SERVER 32767
+#define TCP_MINIMUM_CLIENT 32768
+#define TCP_MAXIMUM_CLIENT 65535
+
+minisocket_t* minisockets;
+
+semaphore_t server_semaphore;
+semaphore_t client_semaphore;
+
+queue_t sockets_to_be_deleted;
+
+semaphore_t destroy_semaphore;
+
 struct minisocket
 {
-  int dummy; /* delete this field */
-  /* put your definition of minisockets here */
+	char port_type;
+	int port_number;
+
+	char status;
+	char waiting;
+
+	//Semaphore to wait for an ACK
+	semaphore_t wait_for_ack_sem;
+
+	int seq_num;
+	int ack_num;
+
+	//Stores the data
+	char* data_buffer;
+	int data_len;
+
+	//Synchronizes access to parts of the socket
+	semaphore_t mutex;
+
+	//Threads waiting on the mutex
+	int num_waiting_on_mutex;
+
+	//Destination host's information
+	network_address_t destination_addr;
+	int dst_port;
+
+	//Alerts the thread of waiting packets
+	queue_t waiting_packets;
+	semaphore_t packet_ready;
+
+	int timeout;
 };
 
 /* Initializes the minisocket layer. */
 void minisocket_initialize()
 {
+	int i = TCP_MINIMUM_SERVER;
 
+	minisockets = (minisocket_t*) malloc(sizeof(minisocket_t) * (TCP_MAXIMUM_CLIENT - TCP_MINIMUM_SERVER + 1));
+	
+	if (minisockets == NULL)
+		return;
+
+	while (i <= TCP_MAXIMUM_CLIENT)
+	{
+		minisockets[i] = NULL;
+		i++;
+	}
+
+	//Mutex that controls access to the minithreads array for server ports
+	server_semaphore = semaphore_create();
+	semaphore_initialize(server_semaphore, 1);
+
+	//Mutex that controls access to the minithreads array for client ports
+	client_semaphore = semaphore_create();
+	semaphore_initialize(client_semaphore, 1);
+
+	//Queue of sockets that will be deleted
+	sockets_to_delete = queue_new();
+
+	//Semaphore that signals the thread to delete sockets performs
+	sockets_to_be_deleted = semaphore_create();
+	semaphore_initialize(sockets_to_be_deleted, 0);
+
+	//Synchronize access to semaphore_destroy()
+	destroy_semaphore = semaphore_create();
+	semaphore_initialize(destroy_semaphore, 1);
+
+	//Fork the thread that deletes sockets on command
+	//NOTE DELETE SOCKETS NOT COMPLETED
+	minithread_fork((proc_t) &delete_sockets, (void*) NULL);
 }
 
 /* 

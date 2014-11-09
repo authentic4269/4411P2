@@ -38,6 +38,13 @@ enum minisocket_statuses {
 	TCP_PORT_UNABLE_TO_CONNECT
 };
 
+enum minisocket_waiting_statuses {
+	TCP_PORT_WAITING_NONE = 1,
+	TCP_PORT_WAITING_SYNACK,
+	TCP_PORT_WAITING_ACK,
+	TCP_PORT_WAITING_TO_CLOSE
+};
+
 /* Initializes the minisocket layer. */
 void minisocket_initialize();
 

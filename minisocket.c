@@ -30,6 +30,7 @@ struct minisocket
 	int port_number;
 
 	char status;
+	char waiting;
 
 	//Semaphore to wait for an ACK
 	semaphore_t wait_for_ack_semaphore;
@@ -44,7 +45,7 @@ struct minisocket
 	//Synchronizes access to parts of the socket
 	semaphore_t mutex;
 
-	int threads_waiting_on_mutex;
+	int num_waiting_on_mutex;
 
 	//Destination host's information
 	network_address_t destination_addr;
@@ -102,6 +103,62 @@ void delete_sockets(void *arg) {
 
 }
 
+void minisocket_destory(minisocket_t minisocket, int FIN)
+{
+	int portNumber;
+
+	if (minisocket == NULL)
+		return;
+
+	portNumber = minisocket->port_number;
+
+	semaphore_P(destroy_semaphore);
+
+	minisocket->waiting = TCP_PORT_WAITING_TO_CLOSE;
+
+	if (minisockets[portNumber] == NULL)
+		return;
+
+	semaphore_V(minisocket->packet_ready);
+
+	semaphore_P(minisocket->mutex);
+
+	if (minisockets[portNumber] == NULL)
+		return;
+
+	if (FIN == 1)
+		transmit_packet(minisocket, minisocket->destination_addr, minisocket->destination_port,
+			1, MSG_FIN, 0, NULL, &error);
+
+	minisocket->status = TCP_PORT_CLOSING;
+
+	threads = minisocket->num_waiting_on_mutex;
+
+	while (i < threads)
+	{
+		semaphore_V(minisocket->mutex);
+		i++;
+	}
+
+	minisockets[portNumber] = NULL;
+
+	//MITCH CHECK IF INTERRUPT SETTING REQUIRED
+	//level = set_interrupt_level(DISABLED);
+	semaphore_destroy(minisocket->wait_for_ack_semaphore);
+	semaphore_destroy(minisocket->mutex);
+	semaphore_destroy(minisocket->packet_ready);
+
+	if (minisocket->data_length != 0)
+		free(minisocket->data_buffer);
+
+	queue_free(minisocket->waiting_packets);
+	//set_interrupt_level(level);
+
+	free(minisocket);
+
+	semaphore_V(destroy_semaphore);
+}
+
 /*
  * Creates a socket 
  * The argument "port" is the port number of the created socket
@@ -132,7 +189,7 @@ minisocket_t minisocket_create_socket(int port)
 	newMinisocket->ack_number = 0;
 	newMinisocket->data_buffer = NULL;
 	newMinisocket->data_length = 0;
-	newMinisocket->threads_waiting_on_mutex = 0;
+	newMinisocket->num_waiting_on_mutex = 0;
 	newMinisocket->timeout = 100;
 
 	newMinisocket->wait_for_ack_semaphore = semaphore_create();
@@ -359,8 +416,65 @@ minisocket_t minisocket_client_create(network_address_t addr, int port, minisock
  */
 int minisocket_send(minisocket_t socket, minimsg_t msg, int len, minisocket_error *error)
 {
-	return 0;
+	int portNumber;
+	int sentLength;
+	int sentData;
 
+	if (socket == NULL || msg == NULL || len <= 0)
+	{
+		*error = SOCKET_INVALIDPARAMS;
+		return -1;
+	}
+
+	if (error == NULL)
+		return -1;
+
+	portNumber = socket->port_number;
+
+	if (socket->status == TCP_PORT_CLOSING || socket->waiting == TCP_PORT_WAITING_TO_CLOSE
+		|| minisockets[portNumber] == NULL)
+	{
+		*error = SOCKET_SENDERROR;
+		return -1;
+	}
+
+	socket->num_waiting_on_mutex++;
+
+	semaphore_P(socket->mutex);
+
+	socket->num_waiting_on_mutex--;
+
+	if (socket->status == TCP_PORT_CLOSING || socket->waiting == TCP_PORT_WAITING_TO_CLOSE
+		|| minisockets[portNumber] == NULL)
+	{
+		*error = SOCKET_SENDERROR;
+		semaphore_V(socket->mutex);
+		return -1;
+	}
+
+	//MITCH HELP HERE! Concept is right but implementation might not be!!!
+	maxDataSize = MAXIMUM_NETWORK_PKT_SIZE - sizeof(struct miniheader);
+	while (len > 0)
+	{
+		sentLength = (maxDataSize > len ? len : maxDataSize);
+		check = transmit_packet(socket, socket->destination_addr, socket->destination_port,
+				, MSG_ACK, sentLength, (msg+sentData), error);
+
+		if (check == -1)
+		{
+			semaphore_V(socket->mutex);
+			minisocket_destory(socket, 0);
+			return (sentData == 0 ? -1 : sentData);
+		}
+
+		len -= maxDataSize;
+		sentData += sentLength;
+	}
+
+	semaphore_V(socket->mutex);
+	*error = SOCKET_NOERROR;
+
+	return 0;
 }
 
 /*
@@ -375,8 +489,121 @@ int minisocket_send(minisocket_t socket, minimsg_t msg, int len, minisocket_erro
  */
 int minisocket_receive(minisocket_t socket, minimsg_t msg, int max_len, minisocket_error *error)
 {
-	return 0;
+	int portNumber;
+	int packetSize;
+	char* packetContents;
+	network_interrupt_arg_t* arg;
+	int dataLength;
+	int returnLength;
+	char* oldDataBuffer;
+	int newLength;
+	//Maybe missing variable?
 
+	if (socket == NULL || msg == NULL || max_len <= 0)
+	{
+		*error = SOCKET_INVALIDPARAMS;
+		return -1;
+	}	
+
+	portNumber = socket->port_number;
+
+	if (socket->status == TCP_PORT_CLOSING || socket -> waiting == TCP_PORT_WAITING_TO_CLOSE
+		|| minisockets[portNumber] == NULL)
+	{
+		*error = SOCKET_RECEIVEERROR;
+		return -1;
+	}
+
+	socket->num_waiting_on_mutex++;
+	semaphore_P(socket->mutex);
+	socket->num_waiting_on_mutex--;
+
+	if (socket->status == TCP_PORT_CLOSING || socket -> waiting == TCP_PORT_WAITING_TO_CLOSE
+		|| minisockets[portNumber] == NULL)
+	{
+		*error = SOCKET_RECEIVEERROR;
+		semaphore_V(socket->mutex);
+		return -1;
+	}
+
+	if (socket->data_length == 0 && queue_length(socket->waiting_packets) == 0)
+	{
+		semaphore_initialize(socket->packet_ready, 0);
+		semaphore_P(socket->packet_ready);
+
+		if (socket->status == TCP_PORT_CLOSING || socket->waiting == TCP_PORT_WAITING_TO_CLOSE
+			|| minisockets[portNumber] == NULL)
+		{
+			*error = SOCKET_RECEIVEERROR;
+			semaphore_V(socket->mutex);
+			return -1;
+		}
+	}
+
+	if (queue_length(socket->waiting_packets) > 0)
+	{	
+		//MITCH CHECK THIS!
+		//prev_level = set_interrupt_level(DISABLED);
+		queue_dequeue(socket->waiting_packets, (void**) &arg);
+		//set_interrupt_level(prev_level);
+
+		packetSize = arg->size;
+
+		//check this line
+		packetContents = (char*) (arg->buffer + sizeof(struct mini_header));
+
+		dataLength = packetSize - sizeof(struct mini_header));
+
+		if (socket->data_length > 0)
+		{
+			newDataBuffer = (char*) malloc(socket->data_length + dataLength);
+
+			memcpy(newDataBuffer, socket->data_buffer, socket->data_length);
+
+			memcpy(newDataBuffer+socket->data_length, packetContents+sizeof(struct miniheader), data_length);
+
+			free(socket->data_buffer);
+
+			socket->data_buffer = newDataBuffer;
+			socket->data_length += dataLength;
+		}
+		else
+		{
+			socket->data_buffer = (char*) malloc(dataLength);
+			memcpy(socket->data_buffer, packetContents+sizeof(struct miniheader), dataLength);
+			socket->data_length = dataLength;
+			semaphore_V(socket->packet_ready);
+		}
+
+		free(arg);
+	}
+
+	returnLength = max_len;
+	if (socket->data_length < max_len)
+		returnLength = socket->data_length;
+
+	memcpy(msg, socket->data_buffer, returnLength);
+
+	newLength = socket->data_length - returnLength;
+
+	if (newLength == 0)
+	{
+		free(socket->data_buffer);
+		socket->data_buffer = NULL;
+	}
+	else
+	{
+		oldDataBuffer = socket->data_buffer;
+		socket->data_buffer = (char*) malloc(newLength);
+		memcpy(socket->data_buffer, +returnLength, newLength);
+		free(oldDataBuffer);
+	}
+
+	socket->data_length = newLength;
+
+	semaphore_V(socket->mutex);
+	*error = SOCKET_NOERROR;
+	return returnLength;
 }
 
 /* Close a connection. If minisocket_close is issued, any send or receive should

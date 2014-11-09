@@ -175,6 +175,8 @@ minisocket_t minisocket_create_socket(int port)
 	return newMinisocket;
 }
 
+
+
 /* 
  * Listen for a connection from somebody else. When communication link is
  * created return a minisocket_t through which the communication can be made
@@ -253,6 +255,13 @@ minisocket_t minisocket_server_create(int port, minisocket_error *error)
 	return newMinisocket;
 }
 
+/*
+ * Get the minisocket associated with a given port number
+ */
+minisocket_t minisocket_get(int num)
+{
+	return minisockets[num];
+}
 
 /*
  * Initiate the communication with a remote site. When communication is
@@ -304,7 +313,7 @@ minisocket_t minisocket_client_create(network_address_t addr, int port, minisock
 		return NULL;
 	}
 
-	minisocket->port_type = TCP_PORT_TYPE_CLIENT;
+	newMinisocket->port_type = TCP_PORT_TYPE_CLIENT;
 	network_address_copy(addr, newMinisocket->destination_addr);
 	minisocket->destination_port = port;
 

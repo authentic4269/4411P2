@@ -322,18 +322,38 @@ minithread_sleep_with_timeout(int delay)
 
 void network_handler(network_interrupt_arg_t *arg) {
 	mini_header_t header;
+	minisocket_t incomingSocket;
+	mini_header_reliable_t reliable_header;
 	miniport_t incomingPort;
+	minisocket_error err;
 	header = (mini_header_t) arg->buffer; 
-	incomingPort = miniport_get_unbound(unpack_unsigned_short(header->destination_port));
-	if (incomingPort == NULL)
+	if (header->protocol == PROTOCOL_MINIDATAGRAM)
 	{
-		// Nobody was waiting to receive the packet
-		printf("packet dropped like it's hot\n");
-		return;
+		incomingPort = miniport_get_unbound(unpack_unsigned_short(header->destination_port));
+		if (incomingPort == NULL)
+		{
+			// Nobody was waiting to receive the packet
+			printf("packet dropped like it's hot\n");
+			return;
+		}
+  		queue_append(incomingPort->port_data.unbound.data_queue, arg);
+		semaphore_V(incomingPort->port_data.unbound.data_available);
 	}
-	
-  	queue_append(incomingPort->port_data.unbound.data_queue, arg);
-	semaphore_V(incomingPort->port_data.unbound.data_available);
+	else 
+	{
+		reliable_header = (mini_header_reliable_t) arg->buffer;
+		incomingSocket = minisocket_get(unpack_unsigned_short(reliable_header->destination_port));
+		if (incomingSocket == NULL)
+		{
+			printf("packed dropped like it's hot\n");
+			return;
+		}
+		minimsg_receive(incomingSocket, arg->buffer, arg->size, error);
+		// TODO handle error cases, if necessary
+		if (error == SOCKET_NOERROR)
+		{
+		}
+	}
 }
 
 /*

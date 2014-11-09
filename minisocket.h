@@ -41,6 +41,9 @@ enum minisocket_statuses {
 /* Initializes the minisocket layer. */
 void minisocket_initialize();
 
+minisocket_t minisocket_get(int socketNum);
+
+
 /* 
  * Listen for a connection from somebody else. When communication link is
  * created return a minisocket_t through which the communication can be made

@@ -61,7 +61,7 @@ struct minisocket
 void minisocket_initialize()
 {
 	int i = TCP_MINIMUM_SERVER;
-	int currentClientPort = 0;
+	//int currentClientPort = 0;
 
 	minisockets = (minisocket_t*) malloc(sizeof(minisocket_t) * (TCP_MAXIMUM_CLIENT - TCP_MINIMUM_SERVER + 1));
 	
@@ -98,6 +98,10 @@ void minisocket_initialize()
 	//minithread_fork((proc_t) &delete_sockets, (void*) NULL);
 }
 
+void delete_sockets(void *arg) {
+
+}
+
 /*
  * Creates a socket 
  * The argument "port" is the port number of the created socket
@@ -122,12 +126,6 @@ minisocket_t minisocket_create_socket(int port)
 
 	if (newMinisocket == NULL)
 		return NULL;
-
-
-
-
-
-
 	newMinisocket->port_number = port;
 	newMinisocket->status = TCP_PORT_LISTENING;
 	newMinisocket->seq_number = 0;
@@ -191,6 +189,7 @@ minisocket_t minisocket_create_socket(int port)
 minisocket_t minisocket_server_create(int port, minisocket_error *error)
 {
 	minisocket_t newMinisocket;
+	int ack_check;
 	int connected = 1;
 
 	if (error == NULL)
@@ -240,7 +239,7 @@ minisocket_t minisocket_server_create(int port, minisocket_error *error)
 			newMinisocket->status = TCP_PORT_LISTENING;
 			newMinisocket->ack_number--;
 			newMinisocket->seq_number--;
-			newtwork_address_blankify(newMinisocket->destination_addr);
+			network_address_blankify(newMinisocket->destination_addr);
 			newMinisocket->destination_port = 0;
 		}	
 		else
@@ -275,6 +274,7 @@ minisocket_t minisocket_client_create(network_address_t addr, int port, minisock
 	int totalClientPorts = TCP_MAXIMUM_CLIENT - TCP_MINIMUM_CLIENT + 1;
 	int convertedPortNumber = (((currentClientPort - TCP_MINIMUM_CLIENT)) % totalClientPorts) + totalClientPorts;
 	int i = 1;
+	int transmitCheck;
 
 	if (error == NULL)
 		return NULL;
@@ -305,7 +305,7 @@ minisocket_t minisocket_client_create(network_address_t addr, int port, minisock
 	}
 
 	minisocket->port_type = TCP_PORT_TYPE_CLIENT;
-	network_address_copy(addr, minisocket->destination_addr);
+	network_address_copy(addr, newMinisocket->destination_addr);
 	minisocket->destination_port = port;
 
 	minisockets[port] = newMinisocket;

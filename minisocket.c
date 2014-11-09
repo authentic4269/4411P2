@@ -20,6 +20,8 @@ queue_t sockets_to_be_deleted;
 
 semaphore_t destroy_semaphore;
 
+int currentClientPort;
+
 struct minisocket
 {
 	char port_type;
@@ -57,6 +59,7 @@ struct minisocket
 void minisocket_initialize()
 {
 	int i = TCP_MINIMUM_SERVER;
+	int currentClientPort = 0;
 
 	minisockets = (minisocket_t*) malloc(sizeof(minisocket_t) * (TCP_MAXIMUM_CLIENT - TCP_MINIMUM_SERVER + 1));
 	
@@ -266,13 +269,31 @@ minisocket_t minisocket_server_create(int port, minisocket_error *error)
 minisocket_t minisocket_client_create(network_address_t addr, int port, minisocket_error *error)
 {
 	minisocket_t newMinisocket;
+	int totalClientPorts = TCP_MAXIMUM_CLIENT - TCP_MINIMUM_CLIENT + 1;
+	int convertedPortNumber = (((currentClientPort - TCP_MINIMUM_CLIENT)) % totalClientPorts) + totalClientPorts;
+	int i = 1;
 
 	if (error == NULL)
 		return NULL;
 
 	semaphore_P(client_semaphore);
 
-	newMinisocket = minisocket_create_socket(newMinisocket);
+	while (i < totalClientPorts && (minisockets[convertedPortNumber] != NULL))
+	{
+		convertedPortNumber = (((currentClientPort - TCP_MINIMUM_CLIENT)+i) % totalClientPorts) + totalClientPorts;
+		i++;
+	}
+
+	convertedPortNumber+=TCP_MINIMUM_CLIENT;
+
+	if (minisockets[convertedPortNumber] != NULL)
+	{
+		*error = SOCKET_NOMOREPORTS;
+		semaphore_V(client_semaphore);
+		return NULL;		
+	}
+
+	newMinisocket = minisocket_create_socket(convertedPortNumber);
 	if (newMinisocket == NULL)
 	{
 		*error = SOCKET_OUTOFMEMORY;
@@ -280,7 +301,34 @@ minisocket_t minisocket_client_create(network_address_t addr, int port, minisock
 		return NULL;
 	}
 
+	minisocket->port_type = TCP_PORT_TYPE_CLIENT;
+	network_address_copy(addr, minisocket->destination_addr);
+	minisocket->destination_port = port;
+
+	minisockets[port] = newMinisocket;
+	minisocket->status = TCP_PORT_CONNECTING;
+
 	semaphore_V(client_semaphore);
+
+	transmitCheck = transmit_packet(minisocket, addr, port, 1, MSG_SYN, 0, NULL, error);
+
+	if (minisocket->status == TCP_PORT_UNABLE_TO_CONNECT)
+	{
+		minisockets[port] = NULL;
+		free(minisocket);
+		*error = SOCKET_BUSY;
+		return NULL;
+	}	
+
+	if (transmitCheck == -1)
+	{
+		//*error set by transmit_packet()
+		minisockets[port] = NULL;
+		free(minisocket);
+		return NULL;
+	}
+
+	minisocket->status = TCP_PORT_CONNECTED;
 
 	*error = SOCKET_NOERROR;
 	return newMinisocket;

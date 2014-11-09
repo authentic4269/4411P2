@@ -2,6 +2,7 @@
  *	Implementation of minisockets.
  */
 #include "minisocket.h"
+#include "minithread.h"
 
 #define TCP_PORT_TYPE_SERVER 0
 #define TCP_PORT_TYPE_CLIENT 1
@@ -16,8 +17,9 @@ minisocket_t* minisockets;
 semaphore_t server_semaphore;
 semaphore_t client_semaphore;
 
-queue_t sockets_to_be_deleted;
+queue_t sockets_to_delete;
 
+semaphore_t delete_semaphore;
 semaphore_t destroy_semaphore;
 
 struct minisocket
@@ -81,8 +83,8 @@ void minisocket_initialize()
 	sockets_to_delete = queue_new();
 
 	//Semaphore that signals the thread to delete sockets performs
-	sockets_to_be_deleted = semaphore_create();
-	semaphore_initialize(sockets_to_be_deleted, 0);
+	delete_semaphore = semaphore_create();
+	semaphore_initialize(delete_semaphore, 0);
 
 	//Synchronize access to semaphore_destroy()
 	destroy_semaphore = semaphore_create();
@@ -90,7 +92,7 @@ void minisocket_initialize()
 
 	//Fork the thread that deletes sockets on command
 	//NOTE DELETE SOCKETS NOT COMPLETED
-	minithread_fork((proc_t) &delete_sockets, (void*) NULL);
+	//minithread_fork((proc_t) &delete_sockets, (void*) NULL);
 }
 
 /*
@@ -100,27 +102,28 @@ void minisocket_initialize()
 minisocket_t minisocket_create_socket(int port)
 {
 	minisocket_t newMinisocket;
+	//semaphore_t wait_for_ack_sem;
+	//Synchronizes access to parts of the socket
+	//semaphore_t mutex;
 
+	//Destination host's information
+	//network_address_t destination_addr;
+
+	//Threads waiting on the mutex
+	//int num_waiting_on_mutex;
+
+	//Alerts the thread of waiting packets
+	//semaphore_t packet_ready;
+	//int dst_port;
 	newMinisocket = (minisocket_t) malloc(sizeof(struct minisocket));
 
 	if (newMinisocket == NULL)
 		return NULL;
 
-	//Semaphore to wait for an ACK
-	semaphore_t wait_for_ack_sem;
 
-	//Synchronizes access to parts of the socket
-	semaphore_t mutex;
 
-	//Threads waiting on the mutex
-	int num_waiting_on_mutex;
 
-	//Destination host's information
-	network_address_t destination_addr;
-	int dst_port;
 
-	//Alerts the thread of waiting packets
-	semaphore_t packet_ready;
 
 	newMinisocket->port_number = port;
 	newMinisocket->status = TCP_PORT_LISTENING;
@@ -206,7 +209,7 @@ minisocket_t minisocket_server_create(int port, minisocket_error *error)
 		return NULL;
 	}
 
-	newMinisocket = minisocket_create_socket(newMinisocket);
+	newMinisocket = minisocket_create_socket(port);
 	if (newMinisocket == NULL)
 	{
 		*error = SOCKET_OUTOFMEMORY;
@@ -265,6 +268,7 @@ minisocket_t minisocket_server_create(int port, minisocket_error *error)
  */
 minisocket_t minisocket_client_create(network_address_t addr, int port, minisocket_error *error)
 {
+	return (minisocket_t) NULL;
 
 }
 
@@ -290,6 +294,7 @@ minisocket_t minisocket_client_create(network_address_t addr, int port, minisock
  */
 int minisocket_send(minisocket_t socket, minimsg_t msg, int len, minisocket_error *error)
 {
+	return 0;
 
 }
 
@@ -305,6 +310,7 @@ int minisocket_send(minisocket_t socket, minimsg_t msg, int len, minisocket_erro
  */
 int minisocket_receive(minisocket_t socket, minimsg_t msg, int max_len, minisocket_error *error)
 {
+	return 0;
 
 }
 

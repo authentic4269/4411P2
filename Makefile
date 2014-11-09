@@ -28,6 +28,7 @@ LFLAGS = -lrt -pthread -g
 OBJ =                              \
     minithread.o                   \
     minimsg.o			   \
+    minisocket.o		   \
     miniheader.o		   \
     interrupts.o                   \
     machineprimitives.o            \

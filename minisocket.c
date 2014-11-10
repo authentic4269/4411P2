@@ -62,8 +62,7 @@ void minisocket_initialize()
 	semaphore_initialize(destroy_semaphore, 1);
 
 	//Fork the thread that deletes sockets on command
-	//NOTE DELETE SOCKETS NOT COMPLETED
-	//minithread_fork((proc_t) &delete_sockets, (void*) NULL);
+	minithread_fork((proc_t) &delete_sockets, (void*) NULL);
 }
 
 // Create a packed reliable header given the parameters

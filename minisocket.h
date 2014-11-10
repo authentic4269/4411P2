@@ -154,4 +154,8 @@ int minisocket_receive(minisocket_t socket, minimsg_t msg, int max_len, minisock
  */
 void minisocket_close(minisocket_t socket); 
 
+/*
+ * Destroy a minisocket_t, freeing the associated memory
+ */
+void minisocket_destroy(minisocket_t socket, int arg);
 #endif /* __MINISOCKETS_H_ */

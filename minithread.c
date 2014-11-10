@@ -395,6 +395,7 @@ minithread_system_initialize(proc_t mainproc, arg_t mainarg) {
 
 
 	minithread_clock_init(QUANTA, clock_handler);
+	minisocket_initialize();
 	minimsg_initialize();
 	network_initialize(network_handler);
 	minithread_switch(idleThread->stack_top, mainThread->stack_top);	

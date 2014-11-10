@@ -2,7 +2,6 @@
  *	Implementation of minisockets.
  */
 #include "minisocket.h"
-#include "minithread.h"
 #include "interrupts.h"
 #include "alarm.h"
 
@@ -33,7 +32,7 @@ void minisocket_initialize()
 	//int currentClientPort = 0;
 
 	minisockets = (minisocket_t*) malloc(sizeof(minisocket_t) * (TCP_MAXIMUM_CLIENT - TCP_MINIMUM_SERVER + 1));
-	
+
 	if (minisockets == NULL)
 		return;
 
@@ -63,13 +62,13 @@ void minisocket_initialize()
 	semaphore_initialize(destroy_semaphore, 1);
 
 	//Fork the thread that deletes sockets on command
-	minithread_fork((proc_t) &delete_sockets, (void*) NULL);
+	//minithread_fork((proc_t) &delete_sockets, (void*) NULL);
 }
 
 // Create a packed reliable header given the parameters
 mini_header_reliable_t create_reliable_header(network_address_t src_addr_raw, 
-	int src_port_raw, network_address_t dst_addr_raw, int dst_port_raw, 
-	char message_type, unsigned int seq_num_raw, unsigned int ack_num_raw) 
+		int src_port_raw, network_address_t dst_addr_raw, int dst_port_raw, 
+		char message_type, unsigned int seq_num_raw, unsigned int ack_num_raw) 
 {
 	mini_header_reliable_t header = (mini_header_reliable_t) malloc(sizeof(struct mini_header_reliable));
 	//Fields
@@ -108,7 +107,7 @@ void wake_up_semaphore(void* arg)
 	interrupt_level_t prev_level = set_interrupt_level(DISABLED);
 
 	if (socket != NULL && (socket->waiting == TCP_PORT_WAITING_ACK 
-		|| socket->waiting == TCP_PORT_WAITING_SYNACK))
+				|| socket->waiting == TCP_PORT_WAITING_SYNACK))
 		semaphore_V(socket->wait_for_ack_semaphore);
 
 	set_interrupt_level(prev_level);
@@ -116,16 +115,17 @@ void wake_up_semaphore(void* arg)
 
 //Transmit a packet and handle retransmission attempts
 int transmit_packet(minisocket_t socket, network_address_t dst_addr, int dst_port, 
-					short incr_seq, char message_type, int data_len, char* data,
-					minisocket_error* error)
+		short incr_seq, char message_type, int data_len, char* data,
+		minisocket_error* error)
 {
 	mini_header_reliable_t newReliableHeader;
 
-	int alarmId;
+	void *alarmId;
 	int sendSucessful;
-	networt_get_my_address(my_addr);
+	network_address_t my_addr;
 	int success = 0;
 	//interrupt_level_t prev_level;
+	network_get_my_address(my_addr);
 
 	if (socket == NULL)
 	{
@@ -143,16 +143,20 @@ int transmit_packet(minisocket_t socket, network_address_t dst_addr, int dst_por
 		socket->seq_number++;
 
 	newReliableHeader = create_reliable_header(my_addr, socket->port_number, dst_addr,
-		dst_port, message_type, socket->seq_num, socket->ack_num);
+			dst_port, message_type, socket->seq_number, socket->ack_number);
 
 	socket->timeout = 100;
 	while(socket->timeout <= 6400)
 	{
 		sendSucessful = network_send_pkt(dst_addr, sizeof(struct mini_header_reliable),
-			(char*) header, data_len, (char*) data);
+				(char*) newReliableHeader, data_len, (char*) data);
 
-		//if (sendSucessful == -1)
-		
+		if (sendSucessful == -1)
+		{
+			socket->timeout *= 2;
+			continue;
+		}
+
 		if (incr_seq == 0)
 		{
 			free(newReliableHeader);
@@ -171,7 +175,7 @@ int transmit_packet(minisocket_t socket, network_address_t dst_addr, int dst_por
 		if (socket->waiting == TCP_PORT_WAITING_NONE)
 		{
 			//prev_level = set_interrupt_level(DISABLED);
-			deregister_alrarm(alarmId);
+			deregister_alarm(alarmId);
 			//set_interrupt_level(prev_level);
 			success = 1;
 			break;
@@ -181,7 +185,7 @@ int transmit_packet(minisocket_t socket, network_address_t dst_addr, int dst_por
 			if (socket->status == TCP_PORT_UNABLE_TO_CONNECT)
 			{
 				//prev_level = set_interrupt_level(DISABLED);
-				deregister_alrarm(alarmId);
+				deregister_alarm(alarmId);
 				//set_interrupt_level(prev_level);
 				success = 0;
 				break;
@@ -194,10 +198,10 @@ int transmit_packet(minisocket_t socket, network_address_t dst_addr, int dst_por
 	if (success == 0)
 	{
 		if (incr_seq == 1)
-			socket->seq_num--;
+			socket->seq_number--;
 
 		socket->waiting = TCP_PORT_WAITING_NONE;
-		*error = SOCKETS_NOSERVER;
+		*error = SOCKET_NOSERVER;
 	}
 
 	*error = SOCKET_NOERROR;
@@ -213,14 +217,14 @@ void delete_socket(void* arg)
 
 void delete_sockets(void *arg) {
 	minisocket_t socket;
-	semaphore_P(sockets_to_delete);
+	semaphore_P(delete_semaphore);
 	queue_dequeue(sockets_to_delete, (void**) &socket);
 
 	register_alarm(15000, &delete_socket, (void*) socket);
+	semaphore_V(delete_semaphore);
 }
 
-void minisocket_destory(minisocket_t minisocket, int FIN)
-{
+void minisocket_destroy(minisocket_t minisocket, int FIN) {
 	int portNumber;
 	int i, threads;
 	interrupt_level_t prev_level;
@@ -245,9 +249,10 @@ void minisocket_destory(minisocket_t minisocket, int FIN)
 	if (minisockets[portNumber] == NULL)
 		return;
 
-	if (FIN == 1)
+	if (FIN == 1) {
 		transmit_packet(minisocket, minisocket->destination_addr, minisocket->destination_port,
-			1, MSG_FIN, 0, NULL, &error);
+				1, MSG_FIN, 0, NULL, &error);
+	}
 
 	minisocket->status = TCP_PORT_CLOSING;
 
@@ -395,7 +400,7 @@ minisocket_t minisocket_server_create(int port, minisocket_error *error)
 
 		newMinisocket->ack_number++;
 		ack_check = transmit_packet(newMinisocket, newMinisocket->destination_addr, 
-			newMinisocket->destination_port, 1, MSG_SYNACK, 0, NULL, error);
+				newMinisocket->destination_port, 1, MSG_SYNACK, 0, NULL, error);
 
 		if (ack_check == -1)
 		{
@@ -539,7 +544,7 @@ int minisocket_send(minisocket_t socket, minimsg_t msg, int len, minisocket_erro
 	portNumber = socket->port_number;
 
 	if (socket->status == TCP_PORT_CLOSING || socket->waiting == TCP_PORT_WAITING_TO_CLOSE
-		|| minisockets[portNumber] == NULL)
+			|| minisockets[portNumber] == NULL)
 	{
 		*error = SOCKET_SENDERROR;
 		return -1;
@@ -554,7 +559,7 @@ int minisocket_send(minisocket_t socket, minimsg_t msg, int len, minisocket_erro
 	set_interrupt_level(prev_level);
 
 	if (socket->status == TCP_PORT_CLOSING || socket->waiting == TCP_PORT_WAITING_TO_CLOSE
-		|| minisockets[portNumber] == NULL)
+			|| minisockets[portNumber] == NULL)
 	{
 		*error = SOCKET_SENDERROR;
 		semaphore_V(socket->mutex);
@@ -571,7 +576,7 @@ int minisocket_send(minisocket_t socket, minimsg_t msg, int len, minisocket_erro
 		if (check == -1)
 		{
 			semaphore_V(socket->mutex);
-			minisocket_destory(socket, 0);
+			minisocket_destroy(socket, 0);
 			return (sentData == 0 ? -1 : sentData);
 		}
 		len -= maxDataSize;
@@ -615,7 +620,7 @@ int minisocket_receive(minisocket_t socket, minimsg_t msg, int max_len, minisock
 	portNumber = socket->port_number;
 
 	if (socket->status == TCP_PORT_CLOSING || socket -> waiting == TCP_PORT_WAITING_TO_CLOSE
-		|| minisockets[portNumber] == NULL)
+			|| minisockets[portNumber] == NULL)
 	{
 		*error = SOCKET_RECEIVEERROR;
 		return -1;
@@ -626,7 +631,7 @@ int minisocket_receive(minisocket_t socket, minimsg_t msg, int max_len, minisock
 	socket->num_waiting_on_mutex--;
 
 	if (socket->status == TCP_PORT_CLOSING || socket -> waiting == TCP_PORT_WAITING_TO_CLOSE
-		|| minisockets[portNumber] == NULL)
+			|| minisockets[portNumber] == NULL)
 	{
 		*error = SOCKET_RECEIVEERROR;
 		semaphore_V(socket->mutex);
@@ -639,7 +644,7 @@ int minisocket_receive(minisocket_t socket, minimsg_t msg, int max_len, minisock
 		semaphore_P(socket->packet_ready);
 
 		if (socket->status == TCP_PORT_CLOSING || socket->waiting == TCP_PORT_WAITING_TO_CLOSE
-			|| minisockets[portNumber] == NULL)
+				|| minisockets[portNumber] == NULL)
 		{
 			*error = SOCKET_RECEIVEERROR;
 			semaphore_V(socket->mutex);
@@ -717,5 +722,5 @@ int minisocket_receive(minisocket_t socket, minimsg_t msg, int max_len, minisock
  */
 void minisocket_close(minisocket_t socket)
 {
-	minisocket_destory(socket, 1);
+	minisocket_destroy(socket, 1);
 }

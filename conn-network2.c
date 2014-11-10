@@ -149,12 +149,7 @@ int client(int* arg) {
   return 0;
 }
 
-#ifdef WINCE
-void main(void){
-  READCOMMANDLINE
-#else /* WINNT code */
-main(int argc, char** argv) {
-#endif
+int main(int argc, char** argv) {
 
   if (argc > 1) {
     hostname = argv[1];
@@ -163,5 +158,6 @@ main(int argc, char** argv) {
   else {
 		minithread_system_initialize(server, NULL);
   }
+  return 0;
 }
 

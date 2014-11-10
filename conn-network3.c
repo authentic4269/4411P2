@@ -45,7 +45,7 @@ int sender(int* arg) {
   id = *arg;
   socket = minisocket_server_create(port[id],&error);
   if (socket==NULL){
-    printf("*****GRADING: thread %d.Can't create the server. Error code: %d.\n",error);
+    printf("*****GRADING: thread %d.Can't create the server. Error code: %d.\n", id, error);
     return 0;
   }
 
@@ -131,12 +131,7 @@ int receiver(int* arg) {
   return 0;
 }
 
-#ifdef WINCE
-void main(void){
-  READCOMMANDLINE
-#else /* WINNT code */
-main(int argc, char** argv) {
-#endif
+int main(int argc, char** argv) {
   
   if (argc > 1) {
 	    hostname = argv[1];
@@ -145,4 +140,5 @@ main(int argc, char** argv) {
   else {
 		minithread_system_initialize(server, NULL);
   }
+  return 0;
 }

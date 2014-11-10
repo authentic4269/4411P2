@@ -124,7 +124,7 @@ int transmit_packet(minisocket_t socket, network_address_t dst_addr, int dst_por
 	int sendSucessful;
 	network_address_t my_addr;
 	int success = 0;
-	//interrupt_level_t prev_level;
+
 	network_get_my_address(my_addr);
 
 	if (socket == NULL)
@@ -174,9 +174,7 @@ int transmit_packet(minisocket_t socket, network_address_t dst_addr, int dst_por
 
 		if (socket->waiting == TCP_PORT_WAITING_NONE)
 		{
-			//prev_level = set_interrupt_level(DISABLED);
 			deregister_alarm(alarmId);
-			//set_interrupt_level(prev_level);
 			success = 1;
 			break;
 		}
@@ -184,9 +182,7 @@ int transmit_packet(minisocket_t socket, network_address_t dst_addr, int dst_por
 		{
 			if (socket->status == TCP_PORT_UNABLE_TO_CONNECT)
 			{
-				//prev_level = set_interrupt_level(DISABLED);
 				deregister_alarm(alarmId);
-				//set_interrupt_level(prev_level);
 				success = 0;
 				break;
 			}

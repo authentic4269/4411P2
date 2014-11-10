@@ -3,6 +3,7 @@
  */
 #include "minisocket.h"
 #include "minithread.h"
+#include "interrupts.h"
 
 #define TCP_PORT_TYPE_SERVER 0
 #define TCP_PORT_TYPE_CLIENT 1
@@ -14,8 +15,8 @@
 
 minisocket_t* minisockets;
 
-semaphore_t server_semaphore;
-semaphore_t client_semaphore;
+semaphore_t server_mutex;
+semaphore_t client_mutex;
 
 queue_t sockets_to_delete;
 
@@ -76,12 +77,12 @@ void minisocket_initialize()
 	}
 
 	//Mutex that controls access to the minithreads array for server ports
-	server_semaphore = semaphore_create();
-	semaphore_initialize(server_semaphore, 1);
+	server_mutex = semaphore_create();
+	semaphore_initialize(server_mutex, 1);
 
 	//Mutex that controls access to the minithreads array for client ports
-	client_semaphore = semaphore_create();
-	semaphore_initialize(client_semaphore, 1);
+	client_mutex = semaphore_create();
+	semaphore_initialize(client_mutex, 1);
 
 	//Queue of sockets that will be deleted
 	sockets_to_delete = queue_new();
@@ -260,13 +261,13 @@ minisocket_t minisocket_server_create(int port, minisocket_error *error)
 		return NULL;
 	}
 
-	semaphore_P(server_semaphore);
+	semaphore_P(server_mutex);
 
 	//Checks if port already exists
 	if (minisockets[port] != NULL)
 	{
 		*error = SOCKET_PORTINUSE;
-		semaphore_V(server_semaphore);
+		semaphore_V(server_mutex);
 		return NULL;
 	}
 
@@ -274,14 +275,14 @@ minisocket_t minisocket_server_create(int port, minisocket_error *error)
 	if (newMinisocket == NULL)
 	{
 		*error = SOCKET_OUTOFMEMORY;
-		semaphore_V(server_semaphore);
+		semaphore_V(server_mutex);
 		return NULL;
 	}
 
 	newMinisocket->port_type = TCP_PORT_TYPE_SERVER;
 	minisockets[port] = newMinisocket;
 
-	semaphore_V(server_semaphore);
+	semaphore_V(server_mutex);
 
 	while (connected == 1)
 	{
@@ -345,7 +346,7 @@ minisocket_t minisocket_client_create(network_address_t addr, int port, minisock
 	if (error == NULL)
 		return NULL;
 
-	semaphore_P(client_semaphore);
+	semaphore_P(client_mutex);
 
 	while (i < totalClientPorts && (minisockets[convertedPortNumber] != NULL))
 	{
@@ -358,7 +359,7 @@ minisocket_t minisocket_client_create(network_address_t addr, int port, minisock
 	if (minisockets[convertedPortNumber] != NULL)
 	{
 		*error = SOCKET_NOMOREPORTS;
-		semaphore_V(client_semaphore);
+		semaphore_V(client_mutex);
 		return NULL;		
 	}
 
@@ -366,7 +367,7 @@ minisocket_t minisocket_client_create(network_address_t addr, int port, minisock
 	if (newMinisocket == NULL)
 	{
 		*error = SOCKET_OUTOFMEMORY;
-		semaphore_V(server_semaphore);
+		semaphore_V(client_mutex);
 		return NULL;
 	}
 
@@ -377,7 +378,7 @@ minisocket_t minisocket_client_create(network_address_t addr, int port, minisock
 	minisockets[port] = newMinisocket;
 	minisocket->status = TCP_PORT_CONNECTING;
 
-	semaphore_V(client_semaphore);
+	semaphore_V(client_mutex);
 
 	transmitCheck = transmit_packet(minisocket, addr, port, 1, MSG_SYN, 0, NULL, error);
 	if (transmitCheck == -1)
@@ -419,15 +420,16 @@ int minisocket_send(minisocket_t socket, minimsg_t msg, int len, minisocket_erro
 	int portNumber;
 	int sentLength;
 	int sentData;
+	interrupt_level_t old_intr;
+
+	if (error == NULL)
+		return -1;
 
 	if (socket == NULL || msg == NULL || len <= 0)
 	{
 		*error = SOCKET_INVALIDPARAMS;
 		return -1;
 	}
-
-	if (error == NULL)
-		return -1;
 
 	portNumber = socket->port_number;
 
@@ -438,11 +440,13 @@ int minisocket_send(minisocket_t socket, minimsg_t msg, int len, minisocket_erro
 		return -1;
 	}
 
+	old_intr = set_interrupt_level(DISABLED);
 	socket->num_waiting_on_mutex++;
 
 	semaphore_P(socket->mutex);
 
 	socket->num_waiting_on_mutex--;
+	set_interrupt_level(old_intr);
 
 	if (socket->status == TCP_PORT_CLOSING || socket->waiting == TCP_PORT_WAITING_TO_CLOSE
 		|| minisockets[portNumber] == NULL)
@@ -453,7 +457,7 @@ int minisocket_send(minisocket_t socket, minimsg_t msg, int len, minisocket_erro
 	}
 
 	//MITCH HELP HERE! Concept is right but implementation might not be!!!
-	maxDataSize = MAXIMUM_NETWORK_PKT_SIZE - sizeof(struct miniheader);
+	maxDataSize = MAXIMUM_NETWORK_PKT_SIZE - sizeof(struct mini_header_reliable);
 	while (len > 0)
 	{
 		sentLength = (maxDataSize > len ? len : maxDataSize);

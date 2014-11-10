@@ -14,6 +14,7 @@
 #include "minimsg.h"
 #include "miniheader.h"
 #include "minithread.h"
+#include "minisocket.h"
 #include "multilevel_queue.h"
 #include "queue.h"
 #include "synch.h"
@@ -348,9 +349,9 @@ void network_handler(network_interrupt_arg_t *arg) {
 			printf("packed dropped like it's hot\n");
 			return;
 		}
-		minimsg_receive(incomingSocket, arg->buffer, arg->size, error);
+		minimsg_receive(incomingSocket, arg->buffer, arg->size, err);
 		// TODO handle error cases, if necessary
-		if (error == SOCKET_NOERROR)
+		if (err == SOCKET_NOERROR)
 		{
 		}
 	}

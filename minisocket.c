@@ -99,6 +99,15 @@ void minisocket_initialize()
 	//minithread_fork((proc_t) &delete_sockets, (void*) NULL);
 }
 
+//Transmit a packet and handle retransmission attempts
+int transmit_packet(minisocket_t socket, network_address_t dst_addr, int dst_port, 
+					short incr_seq, char message_type, int data_len, char* data,
+					minisocket_error* error)
+{
+
+	return 0;
+}
+
 void delete_sockets(void *arg) {
 
 }

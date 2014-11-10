@@ -119,6 +119,14 @@ int transmit_packet(minisocket_t socket, network_address_t dst_addr, int dst_por
 					short incr_seq, char message_type, int data_len, char* data,
 					minisocket_error* error)
 {
+	mini_header_reliable_t newReliableHeader;
+
+	int alarmId;
+	int sendSucessful;
+	networt_get_my_address(my_addr);
+	int success = 0;
+	//interrupt_level_t prev_level;
+
 	if (socket == NULL)
 	{
 		*error = SOCKET_INVALIDPARAMS;
@@ -137,8 +145,63 @@ int transmit_packet(minisocket_t socket, network_address_t dst_addr, int dst_por
 	newReliableHeader = create_reliable_header(my_addr, socket->port_number, dst_addr,
 		dst_port, message_type, socket->seq_num, socket->ack_num);
 
-	free(newReliableHeader);
+	socket->timeout = 100;
+	while(socket->timeout <= 6400)
+	{
+		sendSucessful = network_send_pkt(dst_addr, sizeof(struct mini_header_reliable),
+			(char*) header, data_len, (char*) data);
 
+		//if (sendSucessful == -1)
+		
+		if (incr_seq == 0)
+		{
+			free(newReliableHeader);
+			return 0;
+		}
+
+		alarmId = register_alarm(socket->timeout, &wake_up_semaphore, socket);
+
+		if (message_type == MSG_SYN)
+			socket->waiting = TCP_PORT_WAITING_SYNACK;
+		else
+			socket->waiting = TCP_PORT_WAITING_ACK;
+
+		semaphore_P(socket->wait_for_ack_semaphore);
+
+		if (socket->waiting == TCP_PORT_WAITING_NONE)
+		{
+			//prev_level = set_interrupt_level(DISABLED);
+			deregister_alrarm(alarmId);
+			//set_interrupt_level(prev_level);
+			success = 1;
+			break;
+		}
+		else
+		{
+			if (socket->status == TCP_PORT_UNABLE_TO_CONNECT)
+			{
+				//prev_level = set_interrupt_level(DISABLED);
+				deregister_alrarm(alarmId);
+				//set_interrupt_level(prev_level);
+				success = 0;
+				break;
+			}
+			socket->timeout *= 2;
+		}
+	}
+
+	socket->timeout = 100;
+	if (success == 0)
+	{
+		if (incr_seq == 1)
+			socket->seq_num--;
+
+		socket->waiting = TCP_PORT_WAITING_NONE;
+		*error = SOCKETS_NOSERVER;
+	}
+
+	*error = SOCKET_NOERROR;
+	free(newReliableHeader);
 	return 0;
 }
 

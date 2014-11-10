@@ -541,7 +541,7 @@ int minisocket_receive(minisocket_t socket, minimsg_t msg, int max_len, minisock
 
 			memcpy(newDataBuffer, socket->data_buffer, socket->data_length);
 
-			memcpy(newDataBuffer+socket->data_length, packetContents+sizeof(struct mini_header_reliable), socket->data_length);
+			memcpy(newDataBuffer+socket->data_length, packetContents+sizeof(struct mini_header_reliable), dataLength);
 
 			free(socket->data_buffer);
 
@@ -551,7 +551,7 @@ int minisocket_receive(minisocket_t socket, minimsg_t msg, int max_len, minisock
 		else
 		{
 			socket->data_buffer = (char*) malloc(dataLength);
-			memcpy(socket->data_buffer, packetContents, dataLength);
+			memcpy(socket->data_buffer, packetContents+sizeof(struct mini_header_reliable), dataLength);
 			socket->data_length = dataLength;
 			semaphore_V(socket->packet_ready);
 		}
@@ -576,7 +576,7 @@ int minisocket_receive(minisocket_t socket, minimsg_t msg, int max_len, minisock
 	{
 		oldDataBuffer = socket->data_buffer;
 		socket->data_buffer = (char*) malloc(newLength);
-		memcpy(socket->data_buffer, oldDataBuffer, newLength);
+		memcpy(socket->data_buffer, oldDataBuffer+returnLength, newLength);
 		free(oldDataBuffer);
 	}
 

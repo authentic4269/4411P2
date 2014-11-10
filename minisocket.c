@@ -492,7 +492,7 @@ int minisocket_send(minisocket_t socket, minimsg_t msg, int len, minisocket_erro
 	while (len > 0)
 	{
 		sentLength = (maxDataSize > len ? len : maxDataSize);
-		check = transmit_packet(socket, socket->destination_addr, socket->destination_port, socket->seq_number,
+		check = transmit_packet(socket, socket->destination_addr, socket->destination_port, 1,
 				MSG_ACK, sentLength, (msg+sentData), error);
 
 		if (check == -1)
@@ -501,7 +501,6 @@ int minisocket_send(minisocket_t socket, minimsg_t msg, int len, minisocket_erro
 			minisocket_destory(socket, 0);
 			return (sentData == 0 ? -1 : sentData);
 		}
-		socket->seq_number++;
 		len -= maxDataSize;
 		sentData += sentLength;
 	}

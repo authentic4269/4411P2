@@ -233,10 +233,8 @@ minithread_yield() {
 	//Ensure to_run was retreived properly
 	if (to_run == NULL)
 	{
-		set_interrupt_level(ENABLED);
-		while (multilevel_queue_fulllength(multiqueue) == 0);
-		set_interrupt_level(DISABLED);
-		multilevel_queue_dequeue(multiqueue, start, (void **) &to_run);
+		printf("no thread to yield to\n");
+		return;
 	}
 	
 	old_thread = runningThread;

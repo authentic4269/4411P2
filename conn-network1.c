@@ -17,7 +17,7 @@
 
 #define BUFFER_SIZE 100000
 
-int port=80; /* port on which we do the communication */
+int port = 2500; /* port on which we do the communication */
 
 int receive(int* arg); /* forward declaration */
 
@@ -63,9 +63,11 @@ int transmit(int* arg) {
   minisocket_t socket;
   minisocket_error error;
   //minithread_t receiver;
+  printf("forking");
 
   minithread_fork(receive, NULL);
 
+  printf("server starting\n");
   socket = minisocket_server_create(port,&error);
   if (socket==NULL){
     printf("ERROR: %s. Exiting. \n",GetErrorDescription(error));
@@ -117,11 +119,13 @@ int receive(int* arg) {
    * othrevise the client starts before the server and it will
    * fail (there is nobody to connect to).
    */
+  printf("yielding\n");
   minithread_yield();
   
   network_get_my_address(my_address);
   
   /* create a network connection to the local machine */
+  printf("client starting\n");
   socket = minisocket_client_create(my_address, port,&error);
   if (socket==NULL){
     printf("ERROR: %s. Exiting. \n",GetErrorDescription(error));

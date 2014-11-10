@@ -66,6 +66,54 @@ void minisocket_initialize()
 	//minithread_fork((proc_t) &delete_sockets, (void*) NULL);
 }
 
+// Create a packed reliable header given the parameters
+mini_header_reliable_t create_reliable_header(network_address_t src_addr_raw, 
+	int src_port_raw, network_address_t dst_addr_raw, int dst_port_raw, 
+	char message_type, unsigned int seq_num_raw, unsigned int ack_num_raw) 
+{
+	mini_header_reliable_t header = (mini_header_reliable_t) malloc(sizeof(struct mini_header_reliable));
+	//Fields
+	char src_port[2];
+	char dst_port[2];
+	char src_addr[8];
+	char dst_addr[8];
+	char seq_num[4];
+	char ack_num[4];
+
+	//Pack everything
+	pack_unsigned_short(src_port, (unsigned short) src_port_raw);
+	pack_unsigned_short(dst_port, (unsigned short) dst_port_raw);
+	pack_address(src_addr, src_addr_raw);
+	pack_address(dst_addr, dst_addr_raw);
+	pack_unsigned_int(seq_num, seq_num_raw);
+	pack_unsigned_int(ack_num, ack_num_raw);
+
+	//Set header fields
+	header->protocol = (char) PROTOCOL_MINISTREAM;
+	header->message_type = message_type;
+	memcpy(header->source_address, src_addr, 8);
+	memcpy(header->destination_address, dst_addr, 8);
+	memcpy(header->source_port, src_port, 2);
+	memcpy(header->destination_port, dst_port, 2);
+	memcpy(header->seq_number, seq_num, 4);
+	memcpy(header->ack_number, ack_num, 4);
+
+	return header;
+}
+
+/* Used to wakeup a thread when it's attempting retransmissions */
+void wake_up_semaphore(void* arg)
+{
+	minisocket_t socket = (minisocket_t) arg;
+	interrupt_level_t prev_level = set_interrupt_level(DISABLED);
+
+	if (socket != NULL && (socket->waiting == TCP_PORT_WAITING_ACK 
+		|| socket->waiting == TCP_PORT_WAITING_SYNACK))
+		semaphore_V(socket->wait_for_ack_semaphore);
+
+	set_interrupt_level(prev_level);
+}
+
 //Transmit a packet and handle retransmission attempts
 int transmit_packet(minisocket_t socket, network_address_t dst_addr, int dst_port, 
 					short incr_seq, char message_type, int data_len, char* data,
@@ -86,7 +134,10 @@ int transmit_packet(minisocket_t socket, network_address_t dst_addr, int dst_por
 	if (incr_seq == 1)
 		socket->seq_number++;
 
-	
+	newReliableHeader = create_reliable_header(my_addr, socket->port_number, dst_addr,
+		dst_port, message_type, socket->seq_num, socket->ack_num);
+
+	free(newReliableHeader);
 
 	return 0;
 }
@@ -99,7 +150,7 @@ void minisocket_destory(minisocket_t minisocket, int FIN)
 {
 	int portNumber;
 	int i, threads;
-	interrupt_level_t intr;
+	interrupt_level_t prev_level;
 	minisocket_error error;
 
 	if (minisocket == NULL)
@@ -127,7 +178,7 @@ void minisocket_destory(minisocket_t minisocket, int FIN)
 
 	minisocket->status = TCP_PORT_CLOSING;
 
-	intr = set_interrupt_level(DISABLED);
+	prev_level = set_interrupt_level(DISABLED);
 	threads = minisocket->num_waiting_on_mutex;
 
 	for (i = 0; i < threads; i++)
@@ -135,7 +186,7 @@ void minisocket_destory(minisocket_t minisocket, int FIN)
 		semaphore_V(minisocket->mutex);
 		i++;
 	}
-	set_interrupt_level(intr);
+	set_interrupt_level(prev_level);
 
 	minisockets[portNumber] = NULL;
 
@@ -401,7 +452,7 @@ int minisocket_send(minisocket_t socket, minimsg_t msg, int len, minisocket_erro
 	int sentData;
 	int maxDataSize;
 	int check;
-	interrupt_level_t old_intr;
+	interrupt_level_t prev_level;
 
 	if (error == NULL)
 		return -1;
@@ -421,13 +472,13 @@ int minisocket_send(minisocket_t socket, minimsg_t msg, int len, minisocket_erro
 		return -1;
 	}
 
-	old_intr = set_interrupt_level(DISABLED);
+	prev_level = set_interrupt_level(DISABLED);
 	socket->num_waiting_on_mutex++;
 
 	semaphore_P(socket->mutex);
 
 	socket->num_waiting_on_mutex--;
-	set_interrupt_level(old_intr);
+	set_interrupt_level(prev_level);
 
 	if (socket->status == TCP_PORT_CLOSING || socket->waiting == TCP_PORT_WAITING_TO_CLOSE
 		|| minisockets[portNumber] == NULL)

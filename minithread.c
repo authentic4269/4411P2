@@ -233,7 +233,6 @@ minithread_yield() {
 	//Ensure to_run was retreived properly
 	if (to_run == NULL)
 	{
-		printf("no thread to yield to\n");
 		return;
 	}
 	
@@ -347,8 +346,18 @@ void network_handler(network_interrupt_arg_t *arg) {
 			return;
 		}
 		semaphore_P(incomingSocket->mutex);
-		queue_append(incomingSocket->waiting_packets, arg);
-		semaphore_V(incomingSocket->packet_ready);
+		if ((incomingSocket->waiting == TCP_PORT_WAITING_ACK && reliable_header->message_type == MSG_ACK) || (
+			incomingSocket->waiting == TCP_PORT_WAITING_SYNACK && reliable_header->message_type == MSG_SYNACK))
+		{
+			incomingSocket->waiting = TCP_PORT_WAITING_NONE;
+			semaphore_V(incomingSocket->wait_for_ack_semaphore);
+		}
+		else 
+		{
+			queue_append(incomingSocket->waiting_packets, arg);
+			semaphore_V(incomingSocket->packet_ready);
+		}
+		semaphore_V(incomingSocket->mutex);
 	}
 }
 

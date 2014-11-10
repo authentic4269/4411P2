@@ -32,7 +32,6 @@ register_alarm(int delay, alarm_handler_t alarm, void *arg)
     d = (double) ((long) delay * (long) MILLISECOND);
     node->time = (int) (d / (double) QUANTA);
      
-    printf("currentTime: %d, node->time: %d, delay: %f, MILLISECOND: %d, QUANTA: %d\n", currentTime, node->time, d, MILLISECOND, QUANTA);
     node->func = alarm;
     node->arg = arg;
     node->id = (void *) node;

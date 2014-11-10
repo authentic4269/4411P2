@@ -70,7 +70,7 @@ int transmit(int* arg) {
   printf("server starting\n");
   socket = minisocket_server_create(port,&error);
   if (socket==NULL){
-    printf("ERROR: %s. Exiting. \n",GetErrorDescription(error));
+    printf("server ERROR: %s. Exiting. \n",GetErrorDescription(error));
     return -1;
   }
 
@@ -89,7 +89,7 @@ int transmit(int* arg) {
     printf("Sent %d bytes.\n",trans_bytes);
 
     if (error!=SOCKET_NOERROR){
-      printf("ERROR: %s. Exiting. \n",GetErrorDescription(error));
+      printf("server ERROR: %s. Exiting. \n",GetErrorDescription(error));
       /* close the connection */
       minisocket_close(socket);
     
@@ -128,7 +128,7 @@ int receive(int* arg) {
   printf("client starting\n");
   socket = minisocket_client_create(my_address, port,&error);
   if (socket==NULL){
-    printf("ERROR: %s. Exiting. \n",GetErrorDescription(error));
+    printf("client ERROR: %s. Exiting. \n",GetErrorDescription(error));
     return -1;
   }
 
@@ -137,7 +137,7 @@ int receive(int* arg) {
   while (bytes_received!=BUFFER_SIZE){
     int received_bytes;
     if ((received_bytes=minisocket_receive(socket,buffer, BUFFER_SIZE-bytes_received, &error))==-1){
-      printf("ERROR: %s. Exiting. \n",GetErrorDescription(error));
+      printf("client ERROR: %s. Exiting. \n",GetErrorDescription(error));
       /* close the connection */
       minisocket_close(socket);
       return -1;

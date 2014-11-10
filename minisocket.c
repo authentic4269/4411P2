@@ -157,11 +157,11 @@ int transmit_packet(minisocket_t socket, network_address_t dst_addr, int dst_por
 			continue;
 		}
 
-		if (incr_seq == 0)
+		/*if (incr_seq == 0)
 		{
 			free(newReliableHeader);
 			return 0;
-		}
+		}*/
 
 		alarmId = register_alarm(socket->timeout, &wake_up_semaphore, socket);
 
@@ -359,6 +359,8 @@ minisocket_t minisocket_server_create(int port, minisocket_error *error)
 	minisocket_t newMinisocket;
 	int ack_check;
 	int connected = 1;
+	network_interrupt_arg_t *arg;
+	mini_header_reliable_t header;
 
 	if (error == NULL)
 		return NULL;
@@ -394,7 +396,12 @@ minisocket_t minisocket_server_create(int port, minisocket_error *error)
 
 	while (connected == 1)
 	{
-		semaphore_P(newMinisocket->wait_for_ack_semaphore);
+		semaphore_P(newMinisocket->packet_ready);
+		
+		queue_dequeue(newMinisocket->waiting_packets, (void **) &arg);
+		header = (mini_header_reliable_t) arg->buffer;
+		if (header->message_type != MSG_SYN)
+			continue;
 
 		newMinisocket->status = TCP_PORT_CONNECTING;
 
@@ -483,7 +490,7 @@ minisocket_t minisocket_client_create(network_address_t addr, int port, minisock
 	network_address_copy(addr, newMinisocket->destination_addr);
 	newMinisocket->destination_port = port;
 
-	minisockets[port] = newMinisocket;
+	minisockets[convertedPortNumber] = newMinisocket;
 	newMinisocket->status = TCP_PORT_CONNECTING;
 
 	semaphore_V(client_mutex);

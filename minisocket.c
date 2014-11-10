@@ -166,19 +166,7 @@ void minisocket_destory(minisocket_t minisocket, int FIN)
 minisocket_t minisocket_create_socket(int port)
 {
 	minisocket_t newMinisocket;
-	//semaphore_t wait_for_ack_sem;
-	//Synchronizes access to parts of the socket
-	//semaphore_t mutex;
 
-	//Destination host's information
-	//network_address_t destination_addr;
-
-	//Threads waiting on the mutex
-	//int num_waiting_on_mutex;
-
-	//Alerts the thread of waiting packets
-	//semaphore_t packet_ready;
-	//int dst_port;
 	newMinisocket = (minisocket_t) malloc(sizeof(struct minisocket));
 
 	if (newMinisocket == NULL)
@@ -231,8 +219,6 @@ minisocket_t minisocket_create_socket(int port)
 
 	return newMinisocket;
 }
-
-
 
 /* 
  * Listen for a connection from somebody else. When communication link is

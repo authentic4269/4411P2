@@ -205,8 +205,18 @@ int transmit_packet(minisocket_t socket, network_address_t dst_addr, int dst_por
 	return 0;
 }
 
-void delete_sockets(void *arg) {
+void delete_socket(void* arg)
+{
+	minisocket_t socket = (minisocket_t) arg;
+	minisocket_destroy(socket, 0);
+}
 
+void delete_sockets(void *arg) {
+	minisocket_t socket;
+	semaphore_P(sockets_to_delete);
+	queue_dequeue(sockets_to_delete, (void**) &socket);
+
+	register_alarm(15000, &delete_socket, (void*) socket);
 }
 
 void minisocket_destory(minisocket_t minisocket, int FIN)

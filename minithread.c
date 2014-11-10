@@ -326,7 +326,6 @@ void network_handler(network_interrupt_arg_t *arg) {
 	minisocket_t incomingSocket;
 	mini_header_reliable_t reliable_header;
 	miniport_t incomingPort;
-	minisocket_error err;
 	header = (mini_header_t) arg->buffer; 
 	if (header->protocol == PROTOCOL_MINIDATAGRAM)
 	{
@@ -349,11 +348,9 @@ void network_handler(network_interrupt_arg_t *arg) {
 			printf("packed dropped like it's hot\n");
 			return;
 		}
-		minimsg_receive(incomingSocket, arg->buffer, arg->size, err);
-		// TODO handle error cases, if necessary
-		if (err == SOCKET_NOERROR)
-		{
-		}
+		semaphore_P(incomingSocket->mutex);
+		queue_append(incomingSocket->waiting_packets, arg);
+		semaphore_V(incomingSocket->packet_ready);
 	}
 }
 

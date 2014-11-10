@@ -17,6 +17,39 @@
 typedef struct minisocket* minisocket_t;
 typedef enum minisocket_error minisocket_error;
 
+struct minisocket
+{
+	char port_type;
+	int port_number;
+
+	char status;
+	char waiting;
+
+	//Semaphore to wait for an ACK
+	semaphore_t wait_for_ack_semaphore;
+
+	short seq_number;
+	short ack_number;
+
+	//Stores the data
+	char* data_buffer;
+	int data_length;
+
+	//Synchronizes access to parts of the socket
+	semaphore_t mutex;
+
+	int num_waiting_on_mutex;
+
+	//Destination host's information
+	network_address_t destination_addr;
+	int destination_port;
+
+	//Alerts the thread of waiting packets
+	queue_t waiting_packets;
+	semaphore_t packet_ready;
+
+	int timeout;
+};
 
 enum minisocket_error {
   SOCKET_NOERROR=0,

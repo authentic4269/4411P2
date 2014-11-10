@@ -4,6 +4,7 @@
 #include "minisocket.h"
 #include "minithread.h"
 #include "interrupts.h"
+#include "alarm.h"
 
 #define TCP_PORT_TYPE_SERVER 0
 #define TCP_PORT_TYPE_CLIENT 1

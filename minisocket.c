@@ -100,6 +100,15 @@ void minisocket_initialize()
 	//minithread_fork((proc_t) &delete_sockets, (void*) NULL);
 }
 
+//Transmit a packet and handle retransmission attempts
+int transmit_packet(minisocket_t socket, network_address_t dst_addr, int dst_port, 
+					short incr_seq, char message_type, int data_len, char* data,
+					minisocket_error* error)
+{
+
+	return 0;
+}
+
 void delete_sockets(void *arg) {
 
 }
@@ -167,19 +176,7 @@ void minisocket_destory(minisocket_t minisocket, int FIN)
 minisocket_t minisocket_create_socket(int port)
 {
 	minisocket_t newMinisocket;
-	//semaphore_t wait_for_ack_sem;
-	//Synchronizes access to parts of the socket
-	//semaphore_t mutex;
 
-	//Destination host's information
-	//network_address_t destination_addr;
-
-	//Threads waiting on the mutex
-	//int num_waiting_on_mutex;
-
-	//Alerts the thread of waiting packets
-	//semaphore_t packet_ready;
-	//int dst_port;
 	newMinisocket = (minisocket_t) malloc(sizeof(struct minisocket));
 
 	if (newMinisocket == NULL)
@@ -232,8 +229,6 @@ minisocket_t minisocket_create_socket(int port)
 
 	return newMinisocket;
 }
-
-
 
 /* 
  * Listen for a connection from somebody else. When communication link is

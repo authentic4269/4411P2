@@ -71,6 +71,22 @@ int transmit_packet(minisocket_t socket, network_address_t dst_addr, int dst_por
 					short incr_seq, char message_type, int data_len, char* data,
 					minisocket_error* error)
 {
+	if (socket == NULL)
+	{
+		*error = SOCKET_INVALIDPARAMS;
+		return -1;
+	}
+
+	if (socket->status == TCP_PORT_CLOSING)
+	{
+		*error = SOCKET_SENDERROR;
+		return -1;
+	}
+
+	if (incr_seq == 1)
+		socket->seq_number++;
+
+	
 
 	return 0;
 }

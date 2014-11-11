@@ -127,6 +127,8 @@ int transmit_packet(minisocket_t socket, network_address_t dst_addr, int dst_por
 	network_address_t my_addr;
 	int success = 0;
 	int connected = 0;
+	if (message_type != MSG_SYN)
+		connected = 1;
 
 	network_get_my_address(my_addr);
 
@@ -153,7 +155,6 @@ int transmit_packet(minisocket_t socket, network_address_t dst_addr, int dst_por
 	{
 		sendSucessful = network_send_pkt(dst_addr, sizeof(struct mini_header_reliable),
 				(char*) newReliableHeader, data_len, (char*) data);
-		printf("sent packet\n");
 
 		if (sendSucessful == -1)
 		{
@@ -562,7 +563,7 @@ int minisocket_send(minisocket_t socket, minimsg_t msg, int len, minisocket_erro
 {
 	int portNumber;
 	int sentLength;
-	int sentData;
+	int sentData = 0;
 	int maxDataSize;
 	int check;
 	interrupt_level_t prev_level;
@@ -661,9 +662,6 @@ int minisocket_receive(minisocket_t socket, minimsg_t msg, int max_len, minisock
 		return -1;
 	}
 
-	socket->num_waiting_on_mutex++;
-	semaphore_P(socket->mutex);
-	socket->num_waiting_on_mutex--;
 
 	if (socket->status == TCP_PORT_CLOSING || socket -> waiting == TCP_PORT_WAITING_TO_CLOSE
 			|| minisockets[portNumber] == NULL)
@@ -686,6 +684,7 @@ int minisocket_receive(minisocket_t socket, minimsg_t msg, int max_len, minisock
 		}
 	}
 
+	semaphore_P(socket->mutex);
 	if (queue_length(socket->waiting_packets) > 0)
 	{	
 		queue_dequeue(socket->waiting_packets, (void**) &arg);

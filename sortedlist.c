@@ -30,14 +30,13 @@ int remove_node(sortedlist_t list, void *removeid)
 		} 
 		cur = cur->next;
 	}
-	printf("%d\n", list->length);
 	return 0;
 }
 
 void insert(sortedlist_t list, listnode_t newnode)
 {
 	listnode_t cur;
-	if (list->length == 0)
+	if (list->length == 0 || list->head == NULL)
 	{
 		list->head = newnode;
 		list->length = 1;

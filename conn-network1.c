@@ -61,6 +61,7 @@ int transmit(int* arg) {
   int i;
   int bytes_sent;
   minisocket_t socket;
+  int trans_bytes;
   minisocket_error error;
   //minithread_t receiver;
   printf("forking");
@@ -82,7 +83,7 @@ int transmit(int* arg) {
   /* send the message */
   bytes_sent=0;
   while (bytes_sent!=BUFFER_SIZE){
-    int trans_bytes=
+     trans_bytes=
       minisocket_send(socket,buffer+bytes_sent,
 		      BUFFER_SIZE-bytes_sent, &error);
   

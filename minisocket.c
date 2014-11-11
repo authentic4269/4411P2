@@ -29,6 +29,7 @@ int currentClientPort;
 void minisocket_initialize()
 {
 	int i = TCP_MINIMUM_SERVER;
+	currentClientPort = 0;
 	//int currentClientPort = 0;
 
 	minisockets = (minisocket_t*) malloc(sizeof(minisocket_t) * (TCP_MAXIMUM_CLIENT - TCP_MINIMUM_SERVER + 1));
@@ -96,6 +97,7 @@ mini_header_reliable_t create_reliable_header(network_address_t src_addr_raw,
 	memcpy(header->destination_port, dst_port, 2);
 	memcpy(header->seq_number, seq_num, 4);
 	memcpy(header->ack_number, ack_num, 4);
+	printf("dst: %d", unpack_unsigned_short(header->destination_port));
 
 	return header;
 }
@@ -124,6 +126,7 @@ int transmit_packet(minisocket_t socket, network_address_t dst_addr, int dst_por
 	int sendSucessful;
 	network_address_t my_addr;
 	int success = 0;
+	int connected = 0;
 
 	network_get_my_address(my_addr);
 
@@ -150,6 +153,7 @@ int transmit_packet(minisocket_t socket, network_address_t dst_addr, int dst_por
 	{
 		sendSucessful = network_send_pkt(dst_addr, sizeof(struct mini_header_reliable),
 				(char*) newReliableHeader, data_len, (char*) data);
+		printf("sent packet\n");
 
 		if (sendSucessful == -1)
 		{
@@ -166,14 +170,31 @@ int transmit_packet(minisocket_t socket, network_address_t dst_addr, int dst_por
 		alarmId = register_alarm(socket->timeout, &wake_up_semaphore, socket);
 
 		if (message_type == MSG_SYN)
+		{
 			socket->waiting = TCP_PORT_WAITING_SYNACK;
-		else
+			semaphore_P(socket->wait_for_ack_semaphore);
+		}
+		else if (!connected)
+		{
 			socket->waiting = TCP_PORT_WAITING_ACK;
-
-		semaphore_P(socket->wait_for_ack_semaphore);
+			semaphore_P(socket->wait_for_ack_semaphore);
+		}
+		else {
+			socket->waiting = TCP_PORT_WAITING_NONE;
+		}
 
 		if (socket->waiting == TCP_PORT_WAITING_NONE)
 		{
+			if (message_type == MSG_SYN)
+			{
+				//we got a synack back, so we need to make sure to send an ack to the server
+				newReliableHeader = create_reliable_header(my_addr, socket->port_number, dst_addr,
+				dst_port, MSG_ACK, socket->seq_number, socket->ack_number);
+				socket->timeout = 100;
+				message_type = MSG_ACK;
+				connected = 1;
+				continue;
+			}
 			deregister_alarm(alarmId);
 			success = 1;
 			break;
@@ -402,6 +423,8 @@ minisocket_t minisocket_server_create(int port, minisocket_error *error)
 		newMinisocket->status = TCP_PORT_CONNECTING;
 
 		newMinisocket->ack_number++;
+		unpack_address(header->source_address, newMinisocket->destination_addr);
+		newMinisocket->destination_port = unpack_unsigned_short(header->source_port);
 		ack_check = transmit_packet(newMinisocket, newMinisocket->destination_addr, 
 				newMinisocket->destination_port, 1, MSG_SYNACK, 0, NULL, error);
 
@@ -450,7 +473,7 @@ minisocket_t minisocket_client_create(network_address_t addr, int port, minisock
 {
 	minisocket_t newMinisocket;
 	int totalClientPorts = TCP_MAXIMUM_CLIENT - TCP_MINIMUM_CLIENT + 1;
-	int convertedPortNumber = (((currentClientPort - TCP_MINIMUM_CLIENT)) % totalClientPorts) + totalClientPorts;
+	int convertedPortNumber = (currentClientPort % totalClientPorts) + TCP_MINIMUM_CLIENT;
 	int i = 1;
 	int transmitCheck;
 
@@ -461,11 +484,10 @@ minisocket_t minisocket_client_create(network_address_t addr, int port, minisock
 
 	while (i < totalClientPorts && (minisockets[convertedPortNumber] != NULL))
 	{
-		convertedPortNumber = (((currentClientPort - TCP_MINIMUM_CLIENT)+i) % totalClientPorts) + totalClientPorts;
+		convertedPortNumber = ((currentClientPort + i) % totalClientPorts) + TCP_MINIMUM_CLIENT;
 		i++;
 	}
-
-	convertedPortNumber+=TCP_MINIMUM_CLIENT;
+	currentClientPort += (i-1);
 
 	if (minisockets[convertedPortNumber] != NULL)
 	{
@@ -484,7 +506,7 @@ minisocket_t minisocket_client_create(network_address_t addr, int port, minisock
 
 	newMinisocket->port_type = TCP_PORT_TYPE_CLIENT;
 	network_address_copy(addr, newMinisocket->destination_addr);
-	newMinisocket->destination_port = port;
+	newMinisocket->destination_port = convertedPortNumber;
 
 	minisockets[convertedPortNumber] = newMinisocket;
 	newMinisocket->status = TCP_PORT_CONNECTING;
@@ -495,7 +517,17 @@ minisocket_t minisocket_client_create(network_address_t addr, int port, minisock
 	if (transmitCheck == -1)
 	{
 		//*error set by transmit_packet()
-		minisockets[port] = NULL;
+		minisockets[convertedPortNumber] = NULL;
+		free(newMinisocket);
+		return NULL;
+	}
+	newMinisocket->waiting = TCP_PORT_WAITING_SYNACK;
+	semaphore_P(newMinisocket->wait_for_ack_semaphore);
+
+	transmitCheck = transmit_packet(newMinisocket, addr, port, 1, MSG_ACK, 0, NULL, error);
+	if (transmitCheck == -1)
+	{
+		minisockets[convertedPortNumber] = NULL;
 		free(newMinisocket);
 		return NULL;
 	}
@@ -572,7 +604,7 @@ int minisocket_send(minisocket_t socket, minimsg_t msg, int len, minisocket_erro
 	maxDataSize = MAX_NETWORK_PKT_SIZE - sizeof(struct mini_header_reliable);
 	while (len > 0)
 	{
-		sentLength = (maxDataSize > len ? len : maxDataSize);
+		sentLength = (maxDataSize > len ? maxDataSize : len);
 		check = transmit_packet(socket, socket->destination_addr, socket->destination_port, 1,
 				MSG_ACK, sentLength, (msg+sentData), error);
 
@@ -643,7 +675,6 @@ int minisocket_receive(minisocket_t socket, minimsg_t msg, int max_len, minisock
 
 	if (socket->data_length == 0 && queue_length(socket->waiting_packets) == 0)
 	{
-		semaphore_initialize(socket->packet_ready, 0);
 		semaphore_P(socket->packet_ready);
 
 		if (socket->status == TCP_PORT_CLOSING || socket->waiting == TCP_PORT_WAITING_TO_CLOSE
@@ -666,39 +697,32 @@ int minisocket_receive(minisocket_t socket, minimsg_t msg, int max_len, minisock
 
 		dataLength = packetSize - sizeof(struct mini_header_reliable);
 
-		if (socket->data_length > 0)
+		if (dataLength > 0)
 		{
 			newDataBuffer = (char*) malloc(socket->data_length + dataLength);
 
 			memcpy(newDataBuffer, socket->data_buffer, socket->data_length);
 
-			memcpy(newDataBuffer+socket->data_length, packetContents+sizeof(struct mini_header_reliable), dataLength);
+			memcpy(newDataBuffer+socket->data_length, packetContents, dataLength);
 
 			free(socket->data_buffer);
 
 			socket->data_buffer = newDataBuffer;
 			socket->data_length += dataLength;
 		}
-		else
-		{
-			socket->data_buffer = (char*) malloc(dataLength);
-			memcpy(socket->data_buffer, packetContents+sizeof(struct mini_header_reliable), dataLength);
-			socket->data_length = dataLength;
-			semaphore_V(socket->packet_ready);
-		}
 
 		free(arg);
 	}
 
-	returnLength = max_len;
-	if (socket->data_length < max_len)
-		returnLength = socket->data_length;
+	returnLength = socket->data_length;
+	if (returnLength > max_len)
+		returnLength = max_len;
 
 	memcpy(msg, socket->data_buffer, returnLength);
 
 	newLength = socket->data_length - returnLength;
 
-	if (newLength == 0)
+	if (newLength <= 0)
 	{
 		free(socket->data_buffer);
 		socket->data_buffer = NULL;

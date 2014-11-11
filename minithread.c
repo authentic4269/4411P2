@@ -339,10 +339,11 @@ void network_handler(network_interrupt_arg_t *arg) {
 	else 
 	{
 		reliable_header = (mini_header_reliable_t) arg->buffer;
+		printf("dst port: %d\n", unpack_unsigned_short(reliable_header->destination_port));
 		incomingSocket = minisocket_get(unpack_unsigned_short(reliable_header->destination_port));
 		if (incomingSocket == NULL)
 		{
-			printf("packed dropped like it's hot\n");
+			printf("reliable packed dropped like it's hot\n");
 			return;
 		}
 		semaphore_P(incomingSocket->mutex);
@@ -352,6 +353,7 @@ void network_handler(network_interrupt_arg_t *arg) {
 			incomingSocket->waiting = TCP_PORT_WAITING_NONE;
 			semaphore_V(incomingSocket->wait_for_ack_semaphore);
 		}
+		
 		else 
 		{
 			queue_append(incomingSocket->waiting_packets, arg);

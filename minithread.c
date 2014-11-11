@@ -339,7 +339,7 @@ void network_handler(network_interrupt_arg_t *arg) {
 	else 
 	{
 		reliable_header = (mini_header_reliable_t) arg->buffer;
-		printf("dst port: %d\n", unpack_unsigned_short(reliable_header->destination_port));
+		printf("dst port: %d, type: %d\n", unpack_unsigned_short(reliable_header->destination_port), reliable_header->message_type);
 		incomingSocket = minisocket_get(unpack_unsigned_short(reliable_header->destination_port));
 		if (incomingSocket == NULL)
 		{
@@ -347,8 +347,7 @@ void network_handler(network_interrupt_arg_t *arg) {
 			return;
 		}
 		semaphore_P(incomingSocket->mutex);
-		if ((incomingSocket->waiting == TCP_PORT_WAITING_ACK && reliable_header->message_type == MSG_ACK) || (
-			incomingSocket->waiting == TCP_PORT_WAITING_SYNACK && reliable_header->message_type == MSG_SYNACK))
+		if ((incomingSocket->waiting == TCP_PORT_WAITING_ACK && reliable_header->message_type == MSG_ACK) || (incomingSocket->waiting == TCP_PORT_WAITING_SYNACK && reliable_header->message_type == MSG_SYNACK))
 		{
 			incomingSocket->waiting = TCP_PORT_WAITING_NONE;
 			semaphore_V(incomingSocket->wait_for_ack_semaphore);

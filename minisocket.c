@@ -126,7 +126,6 @@ int transmit_packet(minisocket_t socket, network_address_t dst_addr, int dst_por
 	int sendSucessful;
 	network_address_t my_addr;
 	int success = 0;
-	int connected = 0;
 
 	network_get_my_address(my_addr);
 
@@ -172,20 +171,20 @@ int transmit_packet(minisocket_t socket, network_address_t dst_addr, int dst_por
 		if (message_type == MSG_SYN)
 		{
 			socket->waiting = TCP_PORT_WAITING_SYNACK;
-			semaphore_P(socket->wait_for_ack_semaphore);
 		}
-		else if (!connected)
+/*		else if (!connected)
 		{
 			socket->waiting = TCP_PORT_WAITING_ACK;
 			semaphore_P(socket->wait_for_ack_semaphore);
 		}
-		else {
-			socket->waiting = TCP_PORT_WAITING_NONE;
+*/		else {
+			socket->waiting = TCP_PORT_WAITING_ACK;
 		}
+		semaphore_P(socket->wait_for_ack_semaphore);
 
 		if (socket->waiting == TCP_PORT_WAITING_NONE)
 		{
-			if (message_type == MSG_SYN)
+/*			if (message_type == MSG_SYN)
 			{
 				//we got a synack back, so we need to make sure to send an ack to the server
 				newReliableHeader = create_reliable_header(my_addr, socket->port_number, dst_addr,
@@ -195,7 +194,7 @@ int transmit_packet(minisocket_t socket, network_address_t dst_addr, int dst_por
 				connected = 1;
 				continue;
 			}
-			deregister_alarm(alarmId);
+*/			deregister_alarm(alarmId);
 			success = 1;
 			break;
 		}
@@ -521,9 +520,6 @@ minisocket_t minisocket_client_create(network_address_t addr, int port, minisock
 		free(newMinisocket);
 		return NULL;
 	}
-	newMinisocket->waiting = TCP_PORT_WAITING_SYNACK;
-	semaphore_P(newMinisocket->wait_for_ack_semaphore);
-
 	transmitCheck = transmit_packet(newMinisocket, addr, port, 1, MSG_ACK, 0, NULL, error);
 	if (transmitCheck == -1)
 	{

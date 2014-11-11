@@ -605,7 +605,7 @@ int minisocket_send(minisocket_t socket, minimsg_t msg, int len, minisocket_erro
 	maxDataSize = MAX_NETWORK_PKT_SIZE - sizeof(struct mini_header_reliable);
 	while (len > 0)
 	{
-		sentLength = (maxDataSize > len ? maxDataSize : len);
+		sentLength = (maxDataSize > len ? len : maxDataSize);
 		check = transmit_packet(socket, socket->destination_addr, socket->destination_port, 1,
 				MSG_ACK, sentLength, (msg+sentData), error);
 

@@ -111,7 +111,9 @@ void wake_up_semaphore(void* arg)
 
 	if (socket != NULL && (socket->waiting == TCP_PORT_WAITING_ACK 
 				|| socket->waiting == TCP_PORT_WAITING_SYNACK))
+	{
 		semaphore_V(socket->wait_for_ack_semaphore);
+	}
 
 	set_interrupt_level(prev_level);
 }
@@ -127,12 +129,9 @@ int transmit_packet(minisocket_t socket, network_address_t dst_addr, int dst_por
 	int sendSucessful;
 	network_address_t my_addr;
 	int success = 0;
-<<<<<<< HEAD
 	int connected = 0;
 	if (message_type != MSG_SYN)
 		connected = 1;
-=======
->>>>>>> ee3ca32bee4ee2e057d324d8c524b8e2167cc8fe
 
 	network_get_my_address(my_addr);
 
@@ -177,20 +176,20 @@ int transmit_packet(minisocket_t socket, network_address_t dst_addr, int dst_por
 		if (message_type == MSG_SYN)
 		{
 			socket->waiting = TCP_PORT_WAITING_SYNACK;
+			semaphore_P(socket->wait_for_ack_semaphore);
 		}
-/*		else if (!connected)
+		else if (!connected)
 		{
 			socket->waiting = TCP_PORT_WAITING_ACK;
 			semaphore_P(socket->wait_for_ack_semaphore);
 		}
-*/		else {
-			socket->waiting = TCP_PORT_WAITING_ACK;
+		else {
+			socket->waiting = TCP_PORT_WAITING_NONE;
 		}
-		semaphore_P(socket->wait_for_ack_semaphore);
 
 		if (socket->waiting == TCP_PORT_WAITING_NONE)
 		{
-/*			if (message_type == MSG_SYN)
+			if (message_type == MSG_SYN)
 			{
 				//we got a synack back, so we need to make sure to send an ack to the server
 				newReliableHeader = create_reliable_header(my_addr, socket->port_number, dst_addr,
@@ -200,7 +199,7 @@ int transmit_packet(minisocket_t socket, network_address_t dst_addr, int dst_por
 				connected = 1;
 				continue;
 			}
-*/			deregister_alarm(alarmId);
+			deregister_alarm(alarmId);
 			success = 1;
 			break;
 		}
@@ -526,6 +525,9 @@ minisocket_t minisocket_client_create(network_address_t addr, int port, minisock
 		free(newMinisocket);
 		return NULL;
 	}
+	newMinisocket->waiting = TCP_PORT_WAITING_SYNACK;
+	semaphore_P(newMinisocket->wait_for_ack_semaphore);
+
 	transmitCheck = transmit_packet(newMinisocket, addr, port, 1, MSG_ACK, 0, NULL, error);
 	if (transmitCheck == -1)
 	{

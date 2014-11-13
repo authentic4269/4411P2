@@ -352,8 +352,10 @@ void network_handler(network_interrupt_arg_t *arg) {
 			incomingSocket->waiting == TCP_PORT_WAITING_SYNACK && reliable_header->message_type == MSG_SYNACK))
 		{
 			ack = unpack_unsigned_int(reliable_header->ack_number);
+			if (ack)
+				printf("got an ack\n");
+	
 			incomingSocket->waiting = TCP_PORT_WAITING_NONE;
-			printf("got an ack\n");
 			semaphore_V(incomingSocket->wait_for_ack_semaphore);
 		}
 		

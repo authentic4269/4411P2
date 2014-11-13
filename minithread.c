@@ -324,6 +324,7 @@ void network_handler(network_interrupt_arg_t *arg) {
 	mini_header_reliable_t reliable_header;
 	miniport_t incomingPort;
 	unsigned int ack;
+	unsigned int seq;
 	header = (mini_header_t) arg->buffer; 
 	if (header->protocol == PROTOCOL_MINIDATAGRAM)
 	{
@@ -340,7 +341,7 @@ void network_handler(network_interrupt_arg_t *arg) {
 	else 
 	{
 		reliable_header = (mini_header_reliable_t) arg->buffer;
-		printf("dst port: %d\n", unpack_unsigned_short(reliable_header->destination_port));
+		printf("dst port: %d, type: %d\n", unpack_unsigned_short(reliable_header->destination_port), reliable_header->message_type);
 		incomingSocket = minisocket_get(unpack_unsigned_short(reliable_header->destination_port));
 		if (incomingSocket == NULL)
 		{
@@ -348,19 +349,39 @@ void network_handler(network_interrupt_arg_t *arg) {
 			return;
 		}
 		semaphore_P(incomingSocket->mutex);
+		ack = unpack_unsigned_int(reliable_header->ack_number);
+		seq = unpack_unsigned_int(reliable_header->seq_number);
 		if ((incomingSocket->waiting == TCP_PORT_WAITING_ACK && reliable_header->message_type == MSG_ACK) || (
 			incomingSocket->waiting == TCP_PORT_WAITING_SYNACK && reliable_header->message_type == MSG_SYNACK))
 		{
-			ack = unpack_unsigned_int(reliable_header->ack_number);
-			if (ack)
-				printf("got an ack\n");
-	
-			incomingSocket->waiting = TCP_PORT_WAITING_NONE;
-			semaphore_V(incomingSocket->wait_for_ack_semaphore);
+			if (ack <= incomingSocket->seq_number) {
+				incomingSocket->waiting = TCP_PORT_WAITING_NONE;
+				if (reliable_header->message_type == MSG_ACK)
+					printf("received ack packet, local seq=%d, packet ack=%d\n", incomingSocket->seq_number, ack);
+				if (reliable_header->message_type == MSG_SYNACK)
+					printf("received synack packet, local seq=%d, packet ack=%d\n", incomingSocket->seq_number, ack);
+				semaphore_V(incomingSocket->mutex);
+				semaphore_V(incomingSocket->wait_for_ack_semaphore);
+			}
+			else {
+				printf("reliable ack packet dropped like it's hot: duplicate, local seq=%d, packet ack=%d\n", 
+					incomingSocket->seq_number, ack);
+				semaphore_V(incomingSocket->mutex);
+				return;
+			}
 		}
 		
 		else 
 		{
+			if (seq != incomingSocket->ack_number)
+			{
+				printf("reliable data packet dropped like it's hot: duplicate, local ack=%d, packet seq=%d\n", 
+					incomingSocket->ack_number, seq);
+				semaphore_V(incomingSocket->mutex);
+				return;
+			}
+			printf("received data packet, local ack=%d, packet seq=%d\n", incomingSocket->ack_number, seq);
+			incomingSocket->ack_number++;
 			queue_append(incomingSocket->waiting_packets, arg);
 			semaphore_V(incomingSocket->packet_ready);
 		}
@@ -412,6 +433,6 @@ minithread_system_initialize(proc_t mainproc, arg_t mainarg) {
 	minisocket_initialize();
 	minimsg_initialize();
 	network_initialize(network_handler);
-	network_synthetic_params(0.0, 0.4);
+	network_synthetic_params(0.4, 0.4);
 	minithread_switch(idleThread->stack_top, mainThread->stack_top);	
 }

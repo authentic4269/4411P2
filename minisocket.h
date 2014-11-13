@@ -28,8 +28,8 @@ struct minisocket
 	//Semaphore to wait for an ACK
 	semaphore_t wait_for_ack_semaphore;
 
-	short seq_number;
-	short ack_number;
+	unsigned int seq_number;
+	unsigned int ack_number;
 
 	//Stores the data
 	char* data_buffer;

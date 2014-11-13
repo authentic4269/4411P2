@@ -167,13 +167,12 @@ int transmit_packet(minisocket_t socket, network_address_t dst_addr, int dst_por
 
 
 		alarmId = register_alarm(socket->timeout, &wake_up_semaphore, socket);
-
 		if (incr_seq)
-		{
-			semaphore_P(socket->mutex);
-			socket->seq_number++;
-			semaphore_V(socket->mutex);
-		}	
+			{
+				semaphore_P(socket->mutex);
+				socket->seq_number++;
+				semaphore_V(socket->mutex);
+			}
 		if (message_type == MSG_SYN)
 		{
 			socket->waiting = TCP_PORT_WAITING_SYNACK;

@@ -433,6 +433,6 @@ minithread_system_initialize(proc_t mainproc, arg_t mainarg) {
 	minisocket_initialize();
 	minimsg_initialize();
 	network_initialize(network_handler);
-	network_synthetic_params(0.4, 0.4);
+	network_synthetic_params(0.2, 0.0);
 	minithread_switch(idleThread->stack_top, mainThread->stack_top);	
 }

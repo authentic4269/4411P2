@@ -41,6 +41,8 @@ typedef void (*network_handler_t)(network_interrupt_arg_t *arg);
  */
 int network_initialize(network_handler_t network_handler);
 
+void network_synthetic_params(double loss, double duplication);
+
 /*
  * only used for testing; normally, you should not have to call this
  * function. it should be called before network_initialize, and sets

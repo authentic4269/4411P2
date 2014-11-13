@@ -351,6 +351,7 @@ void network_handler(network_interrupt_arg_t *arg) {
 			incomingSocket->waiting == TCP_PORT_WAITING_SYNACK && reliable_header->message_type == MSG_SYNACK))
 		{
 			incomingSocket->waiting = TCP_PORT_WAITING_NONE;
+			printf("got an ack\n");
 			semaphore_V(incomingSocket->wait_for_ack_semaphore);
 		}
 		
@@ -407,5 +408,6 @@ minithread_system_initialize(proc_t mainproc, arg_t mainarg) {
 	minisocket_initialize();
 	minimsg_initialize();
 	network_initialize(network_handler);
+	network_synthetic_params(0.0, 0.4);
 	minithread_switch(idleThread->stack_top, mainThread->stack_top);	
 }

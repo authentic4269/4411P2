@@ -1,6 +1,7 @@
 /*
  *	Implementation of minisockets.
  */
+#include "minithread.h"
 #include "minisocket.h"
 #include "interrupts.h"
 #include "alarm.h"
@@ -24,6 +25,7 @@ semaphore_t delete_semaphore;
 semaphore_t destroy_semaphore;
 
 int currentClientPort;
+void delete_sockets(void *arg); // forward declaration
 
 /* Initializes the minisocket layer. */
 void minisocket_initialize()
@@ -63,7 +65,7 @@ void minisocket_initialize()
 	semaphore_initialize(destroy_semaphore, 1);
 
 	//Fork the thread that deletes sockets on command
-	//minithread_fork((proc_t) &delete_sockets, (void*) NULL);
+	minithread_fork((proc_t) &delete_sockets, (void*) NULL);
 }
 
 // Create a packed reliable header given the parameters
@@ -97,7 +99,6 @@ mini_header_reliable_t create_reliable_header(network_address_t src_addr_raw,
 	memcpy(header->destination_port, dst_port, 2);
 	memcpy(header->seq_number, seq_num, 4);
 	memcpy(header->ack_number, ack_num, 4);
-	printf("dst: %d", unpack_unsigned_short(header->destination_port));
 
 	return header;
 }

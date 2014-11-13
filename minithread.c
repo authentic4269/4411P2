@@ -323,6 +323,7 @@ void network_handler(network_interrupt_arg_t *arg) {
 	minisocket_t incomingSocket;
 	mini_header_reliable_t reliable_header;
 	miniport_t incomingPort;
+	unsigned int ack;
 	header = (mini_header_t) arg->buffer; 
 	if (header->protocol == PROTOCOL_MINIDATAGRAM)
 	{
@@ -350,6 +351,7 @@ void network_handler(network_interrupt_arg_t *arg) {
 		if ((incomingSocket->waiting == TCP_PORT_WAITING_ACK && reliable_header->message_type == MSG_ACK) || (
 			incomingSocket->waiting == TCP_PORT_WAITING_SYNACK && reliable_header->message_type == MSG_SYNACK))
 		{
+			ack = unpack_unsigned_int(reliable_header->ack_number);
 			incomingSocket->waiting = TCP_PORT_WAITING_NONE;
 			printf("got an ack\n");
 			semaphore_V(incomingSocket->wait_for_ack_semaphore);

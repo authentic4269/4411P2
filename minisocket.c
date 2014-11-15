@@ -240,6 +240,7 @@ void delete_socket(void* arg)
 	minisocket_destroy(socket, 0);
 }
 
+//Supposed to be run in the background
 void delete_sockets(void *arg) {
 	minisocket_t socket;
 	semaphore_P(delete_semaphore);
@@ -249,6 +250,7 @@ void delete_sockets(void *arg) {
 	semaphore_V(delete_semaphore);
 }
 
+//Destroys minisockets
 void minisocket_destroy(minisocket_t minisocket, int FIN) {
 	int portNumber;
 	int i, threads;
@@ -319,6 +321,8 @@ minisocket_t minisocket_create_socket(int port)
 
 	if (newMinisocket == NULL)
 		return NULL;
+
+	//Initialize fields
 	newMinisocket->port_number = port;
 	newMinisocket->status = TCP_PORT_LISTENING;
 	newMinisocket->seq_number = 0;

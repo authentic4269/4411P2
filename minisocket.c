@@ -113,7 +113,6 @@ void wake_up_semaphore(void* arg)
 				|| socket->waiting == TCP_PORT_WAITING_SYNACK))
 	{
 		semaphore_V(socket->wait_for_ack_semaphore);
-		socket->seq_number--;
 	}
 
 	set_interrupt_level(prev_level);
@@ -167,12 +166,6 @@ int transmit_packet(minisocket_t socket, network_address_t dst_addr, int dst_por
 
 
 		alarmId = register_alarm(socket->timeout, &wake_up_semaphore, socket);
-		if (incr_seq)
-			{
-				semaphore_P(socket->mutex);
-				socket->seq_number++;
-				semaphore_V(socket->mutex);
-			}
 		if (message_type == MSG_SYN)
 		{
 			socket->waiting = TCP_PORT_WAITING_SYNACK;
@@ -190,7 +183,14 @@ int transmit_packet(minisocket_t socket, network_address_t dst_addr, int dst_por
 		semaphore_P(socket->mutex);
 		if (socket->waiting == TCP_PORT_WAITING_NONE)
 		{
-			if (message_type == MSG_SYN)
+/* I think incr_seq belongs before the _P on wait_for_ack, but that breaks it for now :/
+			if (incr_seq)
+			{
+				semaphore_P(socket->mutex);
+				socket->seq_number++;
+				semaphore_V(socket->mutex);
+			}
+*/			if (message_type == MSG_SYN)
 			{
 				//we got a synack back, so we need to make sure to send an ack to the server
 				newReliableHeader = create_reliable_header(my_addr, socket->port_number, dst_addr,
@@ -201,6 +201,7 @@ int transmit_packet(minisocket_t socket, network_address_t dst_addr, int dst_por
 				semaphore_V(socket->mutex);
 				continue;
 			}
+
 			deregister_alarm(alarmId);
 			success = 1;
 			semaphore_V(socket->mutex);
@@ -437,7 +438,6 @@ minisocket_t minisocket_server_create(int port, minisocket_error *error)
 		if (ack_check == -1)
 		{
 			newMinisocket->status = TCP_PORT_LISTENING;
-			newMinisocket->seq_number--;
 			network_address_blankify(newMinisocket->destination_addr);
 			newMinisocket->destination_port = 0;
 		}	

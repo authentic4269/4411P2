@@ -67,18 +67,6 @@ void* hashmap_get_item(hashmap_t hashmap, unsigned int key)
 	return NULL;
 }
 
-//Get prev item inserted before item
-hashmap_item_t get_prev(hashmap_item_t item)
-{
-	return item->prev;
-}
-
-//Get next item inserted after item
-hashmap_item_t get_next(hashmap_item_t item)
-{
-	return item->next;
-}
-
 //Get key of hashmap item
 unsigned int item_get_key(hashmap_item_t item)
 {
@@ -89,18 +77,6 @@ unsigned int item_get_key(hashmap_item_t item)
 void* item_get_value(hashmap_item_t item)
 {
 	return item->value;
-}
-
-//Get the first item inserted into the hashmap
-hashmap_item_t hashmap_get_first(hashmap_t hashmap)
-{
-	return hashmap->first;
-}
-
-//Get the last item inserted into the hashmap
-hashmap_item_t hashmap_get_last(hashmap_t hashmap)
-{
-	return hashmap->last;
 }
 
 //Insert key, value pair into hashmap
@@ -152,7 +128,7 @@ int hashmap_insert(hashmap_t hashmap, unsigned int key, void* value)
 	else
 	{
 		free(hashmap->data[index]->value);
-		hashmap->data[index]-value = value;
+		hashmap->data[index]->value = value;
 		return 0;
 	}
 
@@ -171,18 +147,20 @@ int hashmap_insert(hashmap_t hashmap, unsigned int key, void* value)
 }
 
 //Delete key from hashmap
-void hashmap_delete(hashmap_t hashmap, unsigned int key)
+int hashmap_delete(hashmap_t hashmap, unsigned int key)
 {
 	int index = find_insert_index(hashmap, key);
+	int foundItem = -1;
+	int indexSearch;
 
 	if (index == -1 || hashmap->data[index] == NULL)
 		return -1;
 
 	if (hashmap->data[index] == hashmap->first)
-		hashmap->first = get_next(hashmap->first);
+		hashmap->first = hashmap->first->next;
 
 	if (hashmap->data[index] == hashmap->last)
-		hashmap->last = get_prev(hashmap->last);
+		hashmap->last = hashmap->last->prev;
 
 	if (hashmap->data[index]->next != NULL)
 		hashmap->data[index]->next->prev = hashmap->data[index]->prev;
@@ -192,4 +170,30 @@ void hashmap_delete(hashmap_t hashmap, unsigned int key)
 
 	free(hashmap->data[index]);
 	hashmap->data[index] = NULL;
+
+	while (foundItem != -1)
+	{
+		foundItem = -1;
+		indexSearch = (index + 1) % hashmap->size;
+
+		while (indexSearch != index && hashmap->data[indexSearch] != NULL)
+		{
+			if (hashmap->data[indexSearch]->key % hashmap->size <= index)
+				foundItem = indexSearch;
+			indexSearch = (indexSearch + 1) % hashmap->size;
+		}
+
+		if (foundItem != -1)
+		{
+			hashmap->data[index] = hashmap->data[foundItem];
+			hashmap->data[foundItem] == NULL;
+			//index = foundItem;
+		}
+
+		index = foundItem; //I think this goes here could go above
+	}
+
+	hashmap->items--;
+
+	return 0;
 }

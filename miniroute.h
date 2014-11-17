@@ -12,6 +12,14 @@ enum routing_packet_type {
 #define MAX_ROUTE_LENGTH 20
 #define SIZE_OF_ROUTE_CACHE 20
 
+#define ROUTE_REQUESTS_TO_STORE 100
+
+typedef struct routing_header* routing_header_t;
+typedef struct route_request* route_request_t;
+typedef struct route_data* route_data_t;
+typedef struct route_request_seen* route_request_seen_t;
+
+route_request_seen_t* route_request_seen;
 
 struct routing_header
 {
@@ -25,6 +33,28 @@ struct routing_header
 	char path[MAX_ROUTE_LENGTH][8];	/* contains the packed network addresses of each node in the route.
 									   The address of the source is stored in the first position, and the
 									   address of the destination is stored in the last position. */
+};
+
+struct route_request
+{
+	int threads_waiting;
+	semaphore_t initiator_semaphore;
+	semaphore_t waiting_semaphore;
+	network_interrupt_arg_t* interrupt_arg;
+};
+
+struct route_data
+{
+	network_address_t* route;
+	int route_length;
+	int time_found;
+};
+
+struct route_request_seen
+{
+	network_address_t source_addr;
+	int id;
+	int active;
 };
 
 /* Performs any initialization of the miniroute layer, if required. */

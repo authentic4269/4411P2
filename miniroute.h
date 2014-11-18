@@ -2,6 +2,11 @@
 #define _MINIROUTE_H_
 
 #include "minimsg.h"
+#include "hashmap.h"
+
+hashmap_t route_cache;
+hashmap_t discovery_packets_seen;
+hashmap_t current_discovery_requests;
 
 enum routing_packet_type {
   ROUTING_DATA=0,
@@ -17,9 +22,9 @@ enum routing_packet_type {
 typedef struct routing_header* routing_header_t;
 typedef struct route_request* route_request_t;
 typedef struct route_data* route_data_t;
-typedef struct route_request_seen* route_request_seen_t;
+typedef struct route_requests_seen* route_requests_seen_t;
 
-route_request_seen_t* route_request_seen;
+route_requests_seen_t* route_requests_seen;
 
 struct routing_header
 {
@@ -46,11 +51,11 @@ struct route_request
 struct route_data
 {
 	network_address_t* route;
-	int route_length;
+	int length;
 	int time_found;
 };
 
-struct route_request_seen
+struct route_requests_seen
 {
 	network_address_t source_addr;
 	int id;

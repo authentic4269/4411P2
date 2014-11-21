@@ -32,6 +32,7 @@ OBJ =                              \
     machineprimitives_x86_64.o     \
     machineprimitives_x86_64_asm.o \
     random.o                       \
+    sortedlist.o		   \
     alarm.o                        \
     queue.o                        \
     synch.o                        \
@@ -41,6 +42,7 @@ OBJ =                              \
     minisocket.o                   \
     miniroute.o                    \
     multilevel_queue.o             \
+    hashmap.o			   \
     network.o
 
 %: %.o start.o end.o $(OBJ) $(SYSTEMOBJ)

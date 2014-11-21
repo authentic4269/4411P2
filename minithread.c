@@ -12,6 +12,7 @@
 #include "interrupts.h"
 #include "network.h"
 #include "minimsg.h"
+#include "miniroute.h"
 #include "miniheader.h"
 #include "minithread.h"
 #include "minisocket.h"
@@ -31,7 +32,7 @@
 
 sortedlist_t alarms;
 
-int QUANTA = 100 * MILLISECOND;
+int QUANTA = 10 * MILLISECOND;
 int currentTime;
 int quantaRemaining;
 int quantaAssignments[4] = {1, 2, 4, 8};
@@ -110,6 +111,7 @@ int minithread_cleanup(arg_t arg)
 	queue_free(oldThreads);
 	return 0;
 }
+
 
 void
 minithread_exit(minithread_t thread)
@@ -430,6 +432,7 @@ minithread_system_initialize(proc_t mainproc, arg_t mainarg) {
 
 
 	minithread_clock_init(QUANTA, clock_handler);
+	miniroute_initialize();
 	minisocket_initialize();
 	minimsg_initialize();
 	network_initialize(network_handler);

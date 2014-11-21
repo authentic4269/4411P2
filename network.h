@@ -6,11 +6,17 @@
  *      Low-level network interface.
  *
  *      This interface defines a low-level network interface for sending and
- *      receiving packets between pseudo-network interfaces located on the 
+ *      receiving packets between pseudo-network interfaces located on the
  *      same or different hosts.
  */
 
 #define MAX_NETWORK_PKT_SIZE    8192
+
+#define BCAST_ENABLED 1
+#define BCAST_USE_TOPOLOGY_FILE 0
+#define BCAST_ADDRESS "192.168.1.255"
+#define BCAST_LOOPBACK 0
+#define BCAST_TOPOLOGY_FILE "topology.txt"
 
 /* network_address_t's should be treated as opaque types. See functions below */
 typedef unsigned int network_address_t[2];
@@ -41,8 +47,6 @@ typedef void (*network_handler_t)(network_interrupt_arg_t *arg);
  */
 int network_initialize(network_handler_t network_handler);
 
-void network_synthetic_params(double loss, double duplication);
-
 /*
  * only used for testing; normally, you should not have to call this
  * function. it should be called before network_initialize, and sets
@@ -66,6 +70,9 @@ int
 network_send_pkt(network_address_t dest_address,
                  int hdr_len, char * hdr,
                  int  data_len, char * data);
+
+int
+network_bcast_pkt(int hdr_len, char* hdr, int data_len, char* data);
 
 
 /*******************************************************************************
@@ -96,7 +103,7 @@ int network_compare_network_addresses(network_address_t addr1,
  * write the network address in a human-readable way, into a buffer of length
  * "length"; will return -1 if the string is too short, else 0. the address
  * will be in the form "the.text.ip.address:port", e.g. "128.84.223.105:20".
- * Note: the port is an actual UDP port, not a miniport! 
+ * Note: the port is an actual UDP port, not a miniport!
  */
 int network_format_address(network_address_t address, char* string, int length);
 
@@ -105,6 +112,13 @@ void network_address_blankify(network_address_t addr);
 
 /* copy address "original" to address "copy". */
 void network_address_copy(network_address_t original, network_address_t copy);
+
+/* for modifying the broadcast adjacency matrix. */
+void
+network_add_bcast_link(char* src, char* dest);
+
+void
+network_remove_bcast_link(char* src, char* dest);
 
 #endif /*__NETWORK_H_*/
 

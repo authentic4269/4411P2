@@ -83,11 +83,11 @@ int miniroute_send_pkt(network_address_t dest_address, int hdr_len, char* hdr, i
 
 
 /*
- * hash function that generates an unsigned short integer value from a given network address. This value will
+ * hash function that generates an unsigned integer value from a given network address. This value will
  * range between 0 and 65520 (almost the full range of an unsigned short), and you must manually scale or
  * rehash this value into the range you want.
  *
  */
-unsigned short hash_address(network_address_t address);
+unsigned int hash_address(network_address_t address);
 
 #endif /* _MINIROUTE_H_ */

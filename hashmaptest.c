@@ -2,6 +2,12 @@
 #include <stdlib.h>
 #include "hashmap.h"
 
+
+void print_item(hashmap_item_t item);
+void test_hashmap_resize();
+void print_map(hashmap_t hashmap);
+void print_item(hashmap_t hashmap);
+
 void test_hashmap()
 {
 	hashmap_t hashmap = hashmap_new(10, 0);
@@ -144,7 +150,7 @@ void print_list(hashmap_t hashmap)
 	while (item != NULL)
 	{
 		printf(" -> %d", item_get_key(item));
-		item = hashmap_delete(hashmap_get_first(hashmap));
+		item = hashmap_delete(hashmap, hashmap_get_first(hashmap));
 	}
 
 	printf("\n");

@@ -16,14 +16,15 @@
 hashmap_t hashmap_new(int size, int resizable)
 {
 	hashmap_t newHashmap = (hashmap_t) malloc(sizeof(struct hashmap));
+	int i;
 	newHashmap->size = size;
 	newHashmap->items = 0;
 	newHashmap->resizable = resizable;
-	newHashmap->data calloc(size, sizeof(hashmap_item_t));
+	newHashmap->data = calloc(size, sizeof(hashmap_item_t));
 	newHashmap->first = NULL;
 	newHashmap->last = NULL;
 
-	for (int i = 0; i < size; i++)
+	for (i = 0; i < size; i++)
 		newHashmap->data[i] = NULL;
 
 	return newHashmap;
@@ -32,8 +33,9 @@ hashmap_t hashmap_new(int size, int resizable)
 //Destroy hashmap
 void hashmap_destroy(hashmap_t hashmap)
 {
+	int i;
 	//Free items
-	for (int i = 0; i < hashmap->size; i++)
+	for (i = 0; i < hashmap->size; i++)
 		if (hashmap->data[i] != NULL)
 			free(hashmap->data[i]);
 
@@ -46,8 +48,9 @@ void hashmap_destroy(hashmap_t hashmap)
 int find_insert_index(hashmap_t hashmap, unsigned int key)
 {
 	int hash = key % hashmap->size;
+	int i;
 
-	for (int i = 0; i < hashmap->size; i++)
+	for (i = 0; i < hashmap->size; i++)
 		if (hashmap->data[(hash+i)%hashmap->size] == NULL || hashmap->data[(hash+i)%hashmap->size]->key == key)
 			return (hash+i)%(hashmap->size);
 
@@ -56,7 +59,7 @@ int find_insert_index(hashmap_t hashmap, unsigned int key)
 }
 
 //Get item associated with a key in the hashmap
-void* hashmap_get_item(hashmap_t hashmap, unsigned int key)
+void* hashmap_get(hashmap_t hashmap, unsigned int key)
 {
 	int index = find_insert_index(hashmap, key);
 
@@ -186,7 +189,7 @@ int hashmap_delete(hashmap_t hashmap, unsigned int key)
 		if (foundItem != -1)
 		{
 			hashmap->data[index] = hashmap->data[foundItem];
-			hashmap->data[foundItem] == NULL;
+			hashmap->data[foundItem] = NULL;
 			//index = foundItem;
 		}
 

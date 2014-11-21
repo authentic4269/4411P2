@@ -38,7 +38,9 @@ void* item_get_value(hashmap_item_t item);
 //Insert key, value pair into hashmap
 int hashmap_insert(hashmap_t hashmap, unsigned int key, void* value);
 
-//Delete key from hashmap
-void hashmap_delete(hashmap_t hashmap, unsigned int key);
+void* hashmap_get(hashmap_t hashmap, unsigned int key);
+
+//Delete key from hashmap. Return -1 on error
+int hashmap_delete(hashmap_t hashmap, unsigned int key);
 
 #endif /*__HASHMAP_H_*/

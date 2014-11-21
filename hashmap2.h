@@ -7,7 +7,7 @@ typedef struct hashmap* hashmap_t;
 typedef struct hashmap_item{
 	int key;
 	int in_use;
-	any_t data;
+	hashmap_item_t data;
 };
 
 typedef struct hashmap{
@@ -19,16 +19,16 @@ typedef struct hashmap{
 // Return an empty hashmap. Returns NULL if empty.
 hashmap_t hashmap_new();
 
-//Add an element to the hashmap. Return MAP_OK or MAP_OMEM.
+//Add an element to the hashmap. Return 0 or -1.
 int hashmap_put(hashmap_t in, int key, hashmap_item_t value);
 
-//Get an element from the hashmap. Return MAP_OK or MAP_MISSING.
+//Get an element from the hashmap. Return 0 or -1.
 int hashmap_get(hashmap_t in, int key, hashmap_item_t *arg);
 
-//Remove an element from the hashmap. Return MAP_OK or MAP_MISSING.
+//Remove an element from the hashmap. Return 0 or -1.
 int hashmap_remove(hashmap_t in, int key);
 
-//Get any element. Return MAP_OK or MAP_MISSING. remove - should the element be removed from the hashmap
+//Get any element. Return 0 or -1. remove - should the element be removed from the hashmap
 int hashmap_get_one(hashmap_t in, hashmap_item_t *arg, int remove);
 
 //Free hashmap

@@ -27,15 +27,13 @@ int hashmap_hash(hashmap_t hashmap, int key)
 	int curr;
 	int i;
 
-	/* If full, return immediately */
 	if(hashmap->size == hashmap->table_size) 
 		return -1;
 
-	/* Find the best index */
 	curr = hashmap_hash_int(hashmap, key);
 
-	/* Linear probling */
-	for(i = 0; i< hashmap->table_size; i++){
+	for(i = 0; i< hashmap->table_size; i++)
+	{
 		if(hashmap->data[curr].in_use == 0)
 			return curr;
 
@@ -71,7 +69,8 @@ int hashmap_rehash(hashmap_t hashmap)
 	newHashmap->size = 0;
 
 	/* Rehash the elements */
-	for(i = 0; i < old_size; i++){
+	for(i = 0; i < old_size; i++)
+	{
 		int status = hashmap_put(newHashmap, curr[i].key, curr[i].data);
 		if (status != MAP_OK)	
 			return status;
@@ -87,7 +86,8 @@ int hashmap_put(hashmap_t hashmap, int key, hashmap_item_t value)
 {
 	int index = hashmap_hash(hashmap, key);
 
-	while(index == -1){
+	while(index == -1)
+	{
 		if (hashmap_rehash(hashmap) == -1) 
 			return -1;
 		index = hashmap_hash(hashmap, key);

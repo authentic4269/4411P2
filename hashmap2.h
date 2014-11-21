@@ -20,16 +20,16 @@ typedef struct hashmap{
 hashmap_t hashmap_new();
 
 //Add an element to the hashmap. Return MAP_OK or MAP_OMEM.
-int hashmap_put(hashmap_t in, int key, any_t value);
+int hashmap_put(hashmap_t in, int key, hashmap_item_t value);
 
 //Get an element from the hashmap. Return MAP_OK or MAP_MISSING.
-int hashmap_get(hashmap_t in, int key, any_t *arg);
+int hashmap_get(hashmap_t in, int key, hashmap_item_t *arg);
 
 //Remove an element from the hashmap. Return MAP_OK or MAP_MISSING.
 int hashmap_remove(hashmap_t in, int key);
 
 //Get any element. Return MAP_OK or MAP_MISSING. remove - should the element be removed from the hashmap
-int hashmap_get_one(hashmap_t in, any_t *arg, int remove);
+int hashmap_get_one(hashmap_t in, hashmap_item_t *arg, int remove);
 
 //Free hashmap
 void hashmap_destroy(hashmap_t in);

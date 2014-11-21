@@ -1,293 +1,193 @@
-#include < stdlib.h >
-#include < stdio.h >
-#include < minithreads/hashmap.h >
-#include < minithreads/synch.h >
+#include <stdlib.h>
+#include <stdio.h>
+#include "hashmap.h"
 
 #define INITIAL_SIZE 1024
 
-// We need to keep keys and values
-typedef struct _hashmap_element{
-	int key;
-	int in_use;
-	any_t data;
-} hashmap_element;
+//Return an empty hashmap, or NULL on failure.
+hashmap_t hashmap_new() 
+{
+	hashmap_map* hashmap = (hashmap_map*) malloc(sizeof(hashmap_map));
+	if(hashmap == NULL) 
+		return NULL;
 
-  typedef struct _hashmap_map{
-	  int table_size;
-	  int size;
-	  hashmap_element *data;
-	  semaphore_t lock;
-  } hashmap_map;
+	hashmap->data = (hashmap_element*) calloc(INITIAL_SIZE, sizeof(hashmap_element));
+	if(hashmap->data == NULL)
+		return NULL;
 
-/*
- * Return an empty hashmap, or NULL on failure.
- */
-map_t hashmap_new() {
-	hashmap_map* m = (hashmap_map*) malloc(sizeof(hashmap_map));
-	if(!m) goto err;
+	hashmap->table_size = INITIAL_SIZE;
+	hashmap->size = 0;
 
-	m->data = (hashmap_element*) calloc(INITIAL_SIZE, sizeof(hashmap_element));
-	if(!m->data) goto err;
-
-	m->lock = (semaphore_t) semaphore_create();
-	if(!m->lock) goto err;
-	semaphore_initialize(m->lock, 1);
-
-	m->table_size = INITIAL_SIZE;
-	m->size = 0;
-
-	return m;
-err:
-	if (m) 
-		hashmap_free(m);
-	return NULL;		
+	return hashmap;
 }
 
-/*
- * Hashing function for an integer
- */
-unsigned int hashmap_hash_int(hashmap_map * m, unsigned int key){
-	/* Robert Jenkins' 32 bit Mix Function */
-	key += (key << 12);
-	key ^= (key >> 22);
-	key += (key << 4);
-	key ^= (key >> 9);
-	key += (key << 10);
-	key ^= (key >> 2);
-	key += (key << 7);
-	key ^= (key >> 12);
-
-	/* Knuth's Multiplicative Method */
-	key = (key >> 3) * 2654435761;
-
-	return key % m->table_size;
-}
-
-/*
- * Return the integer of the location in data
- * to store the point to the item, or MAP_FULL.
- */
-int hashmap_hash(map_t in, int key){
+//Return the integer of the location in data to store the point to the item, or -1.
+int hashmap_hash(hashmap_t hashmap, int key)
+{
 	int curr;
 	int i;
 
-	/* Cast the hashmap */
-	hashmap_map* m = (hashmap_map *) in;
-
 	/* If full, return immediately */
-	if(m->size == m->table_size) return MAP_FULL;
+	if(hashmap->size == hashmap->table_size) 
+		return -1;
 
 	/* Find the best index */
-	curr = hashmap_hash_int(m, key);
+	curr = hashmap_hash_int(hashmap, key);
 
 	/* Linear probling */
-	for(i = 0; i< m->table_size; i++){
-		if(m->data[curr].in_use == 0)
+	for(i = 0; i< hashmap->table_size; i++){
+		if(hashmap->data[curr].in_use == 0)
 			return curr;
 
-		if(m->data[curr].key == key && m->data[curr].in_use == 1)
+		if(hashmap->data[curr].key == key && hashmap->data[curr].in_use == 1)
 			return curr;
 
-		curr = (curr + 1) % m->table_size;
+		curr = (curr + 1) % hashmap->table_size;
 	}
 
-	return MAP_FULL;
+	return -1;
 }
 
-/*
- * Doubles the size of the hashmap, and rehashes all the elements
- */
-int hashmap_rehash(map_t in){
+//Doubles the size of the hashmap, and rehashes all the elements
+int hashmap_rehash(hashmap_t hashmap)
+{
 	int i;
 	int old_size;
 	hashmap_element* curr;
 
 	/* Setup the new elements */
-	hashmap_map *m = (hashmap_map *) in;	
-	hashmap_element* temp = (hashmap_element *)
-		calloc(2 * m->table_size, sizeof(hashmap_element));
-	if(!temp) return MAP_OMEM;
+	hashmap_map *newHashmap = (hashmap_map *) hashmap;	
+	hashmap_element* temp = (hashmap_element *) calloc(2 * newHashmap->table_size, sizeof(hashmap_element));
+	if(!temp) 
+		return -1;
 
 	/* Update the array */
-	curr = m->data;
-	m->data = temp;
+	curr = newHashmap->data;
+	newHashmap->data = temp;
 
 	/* Update the size */
 	old_size = m->table_size;
-	m->table_size = 2 * m->table_size;
-	m->size = 0;
+	newHashmap->table_size = 2 * newHashmap->table_size;
+	newHashmap->size = 0;
 
 	/* Rehash the elements */
 	for(i = 0; i < old_size; i++){
-		int status = hashmap_put(m, curr[i].key, curr[i].data);
+		int status = hashmap_put(newHashmap, curr[i].key, curr[i].data);
 		if (status != MAP_OK)	
 			return status;
 	}
 
 	free(curr);
 
-	return MAP_OK;
+	return 0;
 }
 
-/* 
- * Add a pointer to the hashmap with some key
- */
-int hashmap_put(map_t in, int key, any_t value){
-	int index;
-	hashmap_map* m;
+//Add a pointer to the hashmap with some key
+int hashmap_put(hashmap_t hashmap, int key, any_t value)
+{
+	int index = hashmap_hash(hashmap, key);
 
-	/* Cast the hashmap */
-	m = (hashmap_map *) in;
-
-	/* Lock for concurrency */
-	semaphore_P(m->lock);
-
-	/* Find a place to put our value */
-	index = hashmap_hash(in, key);
-	while(index == MAP_FULL){
-		if (hashmap_rehash(in) == MAP_OMEM) {
-			semaphore_V(m->lock);
-			return MAP_OMEM;
-		}
-		index = hashmap_hash(in, key);
+	while(index == -1){
+		if (hashmap_rehash(hashmap) == -1) 
+			return -1;
+		index = hashmap_hash(hashmap, key);
 	}
 
-	/* Set the data */
-	m->data[index].data = value;
-	m->data[index].key = key;
-	m->data[index].in_use = 1;
-	m->size++; 
+	hashmap->data[index].data = value;
+	hashmap->data[index].key = key;
+	hashmap->data[index].in_use = 1;
+	hashmap->size++; 
 
-	/* Unlock */
-	semaphore_V(m->lock);
-
-	return MAP_OK;
+	return 0;
 }
 
-/*
- * Get your pointer out of the hashmap with a key
- */
-int hashmap_get(map_t in, int key, any_t *arg){
+//Get your pointer out of the hashmap with a key
+int hashmap_get(hashmap_t hashmap, int key, any_t *arg)
+{
 	int curr;
 	int i;
-	hashmap_map* m;
 
-	/* Cast the hashmap */
-	m = (hashmap_map *) in;
+	curr = hashmap_hash_int(hashmap, key);
 
-	/* Lock for concurrency */
-	semaphore_P(m->lock);		
-
-	/* Find data location */
-	curr = hashmap_hash_int(m, key);
-
-	/* Linear probing, if necessary */
-	for(i = 0; i< m->table_size; i++){
-
-		if(m->data[curr].key == key && m->data[curr].in_use == 1){
-			*arg = (int *) (m->data[curr].data);
-			semaphore_V(m->lock);
-			return MAP_OK;
+	for (i = 0; i< hashmap->table_size; i++)
+	{
+		if (hashmap->data[curr].key == key && hashmap->data[curr].in_use == 1)
+		{
+			*arg = (int *) (hashmap->data[curr].data);
+			return 0;
 		}
 
-		curr = (curr + 1) % m->table_size;
+		curr = (curr + 1) % hashmap->table_size;
 	}
 
 	*arg = NULL;
 
-	/* Unlock */
-	semaphore_V(m->lock);
-
-	/* Not found */
-	return MAP_MISSING;
+	//Not found
+	return -1;
 }
 
 /*
  * Get a random element from the hashmap
  */
-int hashmap_get_one(map_t in, any_t *arg, int remove){
+int hashmap_get_one(hashmap_t hashmap, any_t *arg, int remove)
+{
 	int i;
-	hashmap_map* m;
 
-	/* Cast the hashmap */
-	m = (hashmap_map *) in;
+	if (hashmap_length(hashmap) <= 0) 	
+		return -1;
 
-	/* On empty hashmap return immediately */
-	if (hashmap_length(m) <= 0) 	
-		return MAP_MISSING;
-
-	/* Lock for concurrency */
-	semaphore_P(m->lock);
-
-	/* Linear probing */
-	for(i = 0; i< m->table_size; i++)
-		if(m->data[i].in_use != 0){
-			*arg = (any_t) (m->data[i].data);
-			if (remove) {
-				m->data[i].in_use = 0;
-				m->size--;
+	for (i = 0; i< hashmap->table_size; i++)
+		if (hashmap->data[i].in_use != 0)
+		{
+			*arg = (any_t) (hashmap->data[i].data);
+			if (remove) 
+			{
+				hashmap->data[i].in_use = 0;
+				hashmap->size--;
 			}
-			semaphore_V(m->lock);
-			return MAP_OK;
+			return 0;
 		}
 
-	/* Unlock */
-	semaphore_V(m->lock);
-
-	return MAP_OK;
+	return 0;
 }
 
-/*
- * Remove an element with that key from the map
- */
-int hashmap_remove(map_t in, int key){
+//Remove an element with that key from the map, 0 on success, -1 on fail
+int hashmap_remove(hashmap_t hashmap, int key)
+{
 	int i;
 	int curr;
-	hashmap_map* m;
 
-	/* Cast the hashmap */
-	m = (hashmap_map *) in;
+	curr = hashmap_hash_int(hashmap, key);
 
-	/* Lock for concurrency */
-	semaphore_P(m->lock);
+	for (i = 0; i< hashmap->table_size; i++)
+	{
+		if(hashmap->data[curr].key == key && hashmap->data[curr].in_use == 1)
+		{
+			hashmap->data[curr].in_use = 0;
+			hashmap->data[curr].data = NULL;
+			hashmap->data[curr].key = 0;
 
-	/* Find key */
-	curr = hashmap_hash_int(m, key);
-
-	/* Linear probing, if necessary */
-	for(i = 0; i< m->table_size; i++){
-		if(m->data[curr].key == key && m->data[curr].in_use == 1){
-			/* Blank out the fields */
-			m->data[curr].in_use = 0;
-			m->data[curr].data = NULL;
-			m->data[curr].key = 0;
-
-			/* Reduce the size */
-			m->size--;
-			semaphore_V(m->lock);
-			return MAP_OK;
+			hashmap->size--;
+			return 0;
 		}
-		curr = (curr + 1) % m->table_size;
+		curr = (curr + 1) % hashmap->table_size;
 	}
 
-	/* Unlock */
-	semaphore_V(m->lock);
-
-	/* Data not found */
-	return MAP_MISSING;
+	return -1;
 }
 
-/* Deallocate the hashmap */
-void hashmap_free(map_t in){
-	hashmap_map* m = (hashmap_map*) in;
-	free(m->data);
-	semaphore_destroy(m->lock);
-	free(m);
+//Deallocate the hashmap
+void hashmap_destroy(hashmap_t hashmap)
+{
+	free(hashmap->data);
+	free(hashmap);
 }
 
-/* Return the length of the hashmap */
-int hashmap_length(map_t in){
-	hashmap_map* m = (hashmap_map *) in;
-	if(m != NULL) return m->size;
-	else return 0;
+//Return the length of the hashmap
+int hashmap_length(hashmap_t hashmap)
+{
+	if (hashmap != NULL) 
+		return hashmap->size;
+	else 
+		return 0;
 }

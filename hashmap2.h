@@ -1,45 +1,40 @@
-typedef void *any_t;
+#ifndef __HASHMAP_H__
+#define __HASHMAP_H__
 
-/*
- *  * map_t is a pointer to an internally maintained data structure.
- *   * Clients of this package do not need to know how hashmaps are
- *    * represented.  They see and manipulate only map_t's. 
- *     */
-typedef any_t map_t;
+typedef struct hashmap_item* hashmap_item_t;
+typedef struct hashmap* hashmap_t;
 
-/*
- *  * Return an empty hashmap. Returns NULL if empty.
- *  */
-extern map_t hashmap_new();
+typedef struct hashmap_item{
+	int key;
+	int in_use;
+	any_t data;
+};
 
+typedef struct hashmap{
+	  int table_size;
+	  int size;
+	  hashmap_element *data;
+};
 
-/*
- *  * Add an element to the hashmap. Return MAP_OK or MAP_OMEM.
- *   */
-extern int hashmap_put(map_t in, int key, any_t value);
+// Return an empty hashmap. Returns NULL if empty.
+hashmap_t hashmap_new();
 
-/*
- *  * Get an element from the hashmap. Return MAP_OK or MAP_MISSING.
- *   */
-extern int hashmap_get(map_t in, int key, any_t *arg);
+//Add an element to the hashmap. Return MAP_OK or MAP_OMEM.
+int hashmap_put(hashmap_t in, int key, any_t value);
 
-/*
- *  * Remove an element from the hashmap. Return MAP_OK or MAP_MISSING.
- *   */
-extern int hashmap_remove(map_t in, int key);
+//Get an element from the hashmap. Return MAP_OK or MAP_MISSING.
+int hashmap_get(hashmap_t in, int key, any_t *arg);
 
-/*
- *  * Get any element. Return MAP_OK or MAP_MISSING.
- *   * remove - should the element be removed from the hashmap
- *    */
-extern int hashmap_get_one(map_t in, any_t *arg, int remove);
+//Remove an element from the hashmap. Return MAP_OK or MAP_MISSING.
+int hashmap_remove(hashmap_t in, int key);
 
-/*
- *  * Free the hashmap
- *   */
-extern void hashmap_free(map_t in);
+//Get any element. Return MAP_OK or MAP_MISSING. remove - should the element be removed from the hashmap
+int hashmap_get_one(hashmap_t in, any_t *arg, int remove);
 
-/*
- *  * Get the current size of a hashmap
- *   */
-extern int hashmap_length(map_t in);
+//Free hashmap
+void hashmap_destroy(hashmap_t in);
+
+//Get current size of a hashmap
+int hashmap_length(hashmap_t in);
+
+#endif /*__HASHMAP_H_*/

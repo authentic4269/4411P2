@@ -83,7 +83,7 @@ int hashmap_rehash(hashmap_t hashmap)
 }
 
 //Add a pointer to the hashmap with some key
-int hashmap_put(hashmap_t hashmap, int key, any_t value)
+int hashmap_put(hashmap_t hashmap, int key, hashmap_item_t value)
 {
 	int index = hashmap_hash(hashmap, key);
 
@@ -102,7 +102,7 @@ int hashmap_put(hashmap_t hashmap, int key, any_t value)
 }
 
 //Get your pointer out of the hashmap with a key
-int hashmap_get(hashmap_t hashmap, int key, any_t *arg)
+int hashmap_get(hashmap_t hashmap, int key, hashmap_item_t *arg)
 {
 	int curr;
 	int i;
@@ -129,7 +129,7 @@ int hashmap_get(hashmap_t hashmap, int key, any_t *arg)
 /*
  * Get a random element from the hashmap
  */
-int hashmap_get_one(hashmap_t hashmap, any_t *arg, int remove)
+int hashmap_get_one(hashmap_t hashmap, hashmap_item_t *arg, int remove)
 {
 	int i;
 

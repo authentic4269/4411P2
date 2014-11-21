@@ -320,8 +320,8 @@ minithread_sleep_with_timeout(int delay)
 	set_interrupt_level(previousLevel);
 }
 
-void network_handler(network_interrupt_arg_t *arg) {
-	mini_header_t header;
+
+void handle_data_packet(network_interrupt_arg_t arg) {
 	minisocket_t incomingSocket;
 	mini_header_reliable_t reliable_header;
 	miniport_t incomingPort;
@@ -388,6 +388,45 @@ void network_handler(network_interrupt_arg_t *arg) {
 			semaphore_V(incomingSocket->packet_ready);
 		}
 		semaphore_V(incomingSocket->mutex);
+	}
+
+}
+
+void network_handler(network_interrupt_arg_t *arg) {
+	routing_header_t header = (routing_header_t) arg->buffer;	
+	network_address_t my_addr = network_get_my_address();
+	network_address_t sender;
+	network_address_t cur;
+	int i;
+	short success = 0;
+	unsigned int pathLen;
+	unpack_address(sender, header->destination);
+	unpack_unsigned_int(pathLen, header->path_len);
+	if (header->routing_packet_type == ROUTING_DATA)
+	{
+		if (network_compare_addresses(my_addr, sender) == 0) 
+		{
+			arg->buffer = arg->buffer + sizeof(routing_header);
+			arg->size = arg->size - sizeof(routing_header);
+			handle_data_packet(arg);
+		}
+		else
+		{
+			for (i = 0; i < pathLen-1; i++)
+			{
+				unpack_address(cur, header->path[i]);
+				if (network_compare_address(my_addr, cur) == 0)
+				{
+					unpack_address(cur, header->path[i+1]);
+					success = 1;
+					break;
+				}
+			} 			
+			if (success) 
+			{
+	
+			}
+		}
 	}
 }
 

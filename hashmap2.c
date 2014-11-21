@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include "hashmap.h"
+#include "hashmap2.h"
 
 #define INITIAL_SIZE 1024
 

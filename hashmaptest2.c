@@ -1,4 +1,4 @@
-#include "hashmap.h"
+#include "hashmap2.h"
 #include "stdlib.h"
 #include "stdio.h"
 
@@ -11,7 +11,7 @@ int main(int argc, char *argv) {
 	{
 		val = malloc(sizeof(int)); 
 		*val = i * 10; 
-		hashmap_insert(hashmap, i, val);
+		hashmap_put(hashmap, i, val);
 	}
 	for (i = 0; i < 10; i++)
 	{

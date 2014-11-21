@@ -7,7 +7,7 @@ typedef struct hashmap* hashmap_t;
 typedef struct hashmap_item{
 	int key;
 	int in_use;
-	any_t data;
+	hashmap_item_t data;
 };
 
 typedef struct hashmap{

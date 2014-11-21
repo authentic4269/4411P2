@@ -4,20 +4,31 @@
 
 int main(int argc, char *argv) {
 		printf("insert");
-	hashmap_t hashmap = hashmap_new(20, 1); 
+	hashmap_t hashmap = hashmap_new(); 
 	int i;
 	int *val;
-	for (i = 0; i < 10; i++)
+	for (i = 0; i < 100; i++)
 	{
 		val = malloc(sizeof(int)); 
 		*val = i * 10; 
 		hashmap_put(hashmap, i, val);
 	}
-	for (i = 0; i < 10; i++)
+	if (hashmap_length(hashmap) != 100)
+		printf("length failure\n");
+	for (i = 0; i < 100; i++)
 	{
-		val = hashmap_get(hashmap, i);
+		hashmap_get(hashmap, i, val);
 		if (*val != i * 10)
-			printf("failure\n");
+			printf("get failure\n");
 	}
+	for (i = 0; i < 100; i++)
+	{
+		hashmap_remove(hashmap, i);
+		hashmap_get(hashmap, i, val);
+		if (val != NULL)
+			printf("remove failure\n");
+	}
+	if (hashmap_length(hashmap) != 0)
+		printf("length failure\n");	
 	
 }

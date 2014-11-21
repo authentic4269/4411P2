@@ -7,11 +7,11 @@
 //Return an empty hashmap, or NULL on failure.
 hashmap_t hashmap_new() 
 {
-	hashmap_map* hashmap = (hashmap_map*) malloc(sizeof(hashmap_map));
+	hashmap_t hashmap = (hashmap_t) malloc(sizeof(hashmap));
 	if(hashmap == NULL) 
 		return NULL;
 
-	hashmap->data = (hashmap_element*) calloc(INITIAL_SIZE, sizeof(hashmap_element));
+	hashmap->data = (hashmap_item_t) calloc(INITIAL_SIZE, sizeof(hashmap_item));
 	if(hashmap->data == NULL)
 		return NULL;
 

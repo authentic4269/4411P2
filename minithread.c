@@ -525,7 +525,8 @@ void network_handler(network_interrupt_arg_t *arg) {
 			routeRequest = (route_request_t) hashmap_get(current_discovery_requests, hash_address(src));	
 			if (routeRequest == NULL)
 			{
-				printf("");	
+				printf("current_discovery_requests doesn't contain any waiting threads\n");
+				return;	
 			}
 		}
 		else if (network_compare_addresses(my_addr, src) == 0)

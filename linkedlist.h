@@ -33,12 +33,12 @@ extern int linkedList_dequeue(linkedList_t, void**);
 /*
  * Free the linkedlist and return 0 (success) or -1 (failure).
  */
-extern int linkedList_free (linkedList_t);
+extern int linkedList_free (linkedList_t linkedlist);
 
 /*
  * Check if the linkedlist is empty. Return 1 (empty) 0 (not empty)
  */
-extern int linkedList_isEmpty(linkedList_t);
+extern int linkedList_isEmpty(linkedList_t linkedlist);
 
 /*
  * Return the number of items in the linkedlist, or -1 if an error occured

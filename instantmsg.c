@@ -28,13 +28,13 @@ int receive_first(int* arg)
   int length;
   miniport_t port;
   miniport_t sourcePort;
+  char buffer[BUFFER_SIZE];
+  char buffer2[BUFFER_SIZE];
 
   port = miniport_create_unbound(1);
 
   while(1)
   {
-	  char buffer[BUFFER_SIZE];
-	  char buffer2[BUFFER_SIZE];
     length = BUFFER_SIZE;
 
     printf("\t\t(Waiting for a Friend)\n");
@@ -57,6 +57,9 @@ int transmit_first(int* arg)
   miniport_t port;
   miniport_t destinationPort;
   miniport_t sourcePort;
+  char buffer[BUFFER_SIZE];
+  char buffer2[BUFFER_SIZE];
+  
 
   AbortOnCondition(network_translate_hostname(hostname, addr) < 0, 
     "Could not resolve hostname, exiting.");
@@ -66,8 +69,6 @@ int transmit_first(int* arg)
 
   while(1)
   {
-	  char buffer[BUFFER_SIZE];
-	  char buffer2[BUFFER_SIZE];
     printf("You: ");
     fflush(stdout);
     length = miniterm_read(buffer, BUFFER_SIZE);
@@ -82,14 +83,8 @@ int transmit_first(int* arg)
   return 0;
 }
 
-#ifdef WINCE
-void main(void)
-{
-  READCOMMANDLINE
-#else /* WINNT code */
 int main(int argc, char** argv) 
 {
-#endif
   short fromport, toport;
   fromport = atoi(argv[1]);
   toport = atoi(argv[2]);

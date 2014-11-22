@@ -104,7 +104,7 @@ void miniroute_recieve_reply(network_address_t replier, network_interrupt_arg_t 
 	void *reply_hashmap_item = NULL;
 	route_request_t route_request;
 	int i;
-	i = hashmap_get(current_discovery_requests, hash_address(replier), reply_hashmap_item);
+	i = hashmap_get(current_discovery_requests, hash_address(replier), &reply_hashmap_item);
 	if (i < 0 || reply_hashmap_item == NULL)
 	{
 		if (DEBUG) printf("error: no listener for REPLY_ packet\n");
@@ -149,7 +149,7 @@ int miniroute_send_pkt(network_address_t dest_address, int hdr_len, char* hdr, i
 
 	semaphore_P(route_cache_semaphore);
 
-	hashmap_get(route_cache, hash_address(dest_address), (void *) routeData);
+	hashmap_get(route_cache, hash_address(dest_address), (void **) &routeData);
 
 
 	if (routeData != NULL)
@@ -173,7 +173,7 @@ int miniroute_send_pkt(network_address_t dest_address, int hdr_len, char* hdr, i
 	if (routeValid == 0)
 	{
 		semaphore_P(route_cache_semaphore);
-		hashmap_get(current_discovery_requests, hash_address(dest_address), (void *) routeRequest);
+		hashmap_get(current_discovery_requests, hash_address(dest_address), (void **) &routeRequest);
 
 		if (routeRequest != NULL)
 		{
@@ -183,7 +183,7 @@ int miniroute_send_pkt(network_address_t dest_address, int hdr_len, char* hdr, i
 
 			semaphore_P(routeRequest->waiting_semaphore);
 			semaphore_P(route_cache_semaphore);
-			hashmap_get(route_cache, hash_address(dest_address), (void *) routeData);
+			hashmap_get(route_cache, hash_address(dest_address), (void **) &routeData);
 
 			if (routeData == NULL)
 			{
@@ -224,7 +224,7 @@ int miniroute_send_pkt(network_address_t dest_address, int hdr_len, char* hdr, i
 			if (routeRequest == NULL)
 				return -1;
 
-			hashmap_insert(current_discovery_requests, hash_address(dest_address), routeRequest);
+			hashmap_insert(current_discovery_requests, hash_address(dest_address), (void *) routeRequest);
 			currentRequestId = route_request_id++;
 			semaphore_V(route_cache_semaphore);
 
@@ -284,7 +284,7 @@ int miniroute_send_pkt(network_address_t dest_address, int hdr_len, char* hdr, i
 					}
 
 					semaphore_P(route_cache_semaphore);
-					hashmap_insert(route_cache, hash_address(dest_address), routeData);
+					hashmap_insert(route_cache, hash_address(dest_address), (void *) routeData);
 					semaphore_V(route_cache_semaphore);
 
 					for (j = 0; j < routeRequest->threads_waiting; j++)

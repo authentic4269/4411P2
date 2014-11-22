@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include "hashmap2.h"
 
-#define INITIAL_SIZE 1024
+#define INITIAL_SIZE 64
 
 //Return an empty hashmap, or NULL on failure.
 hashmap_t hashmap_new() 
@@ -27,17 +27,17 @@ int hashmap_hash(hashmap_t hashmap, int key)
 	int curr;
 	int i;
 
-	if(hashmap->size == hashmap->table_size) 
+	if (hashmap->size == hashmap->table_size) 
 		return -1;
 
 	curr = hashmap_hash_int(hashmap, key);
 
-	for(i = 0; i< hashmap->table_size; i++)
+	for (i = 0; i< hashmap->table_size; i++)
 	{
-		if(hashmap->data[curr].in_use == 0)
+		if (hashmap->data[curr].in_use == 0)
 			return curr;
 
-		if(hashmap->data[curr].key == key && hashmap->data[curr].in_use == 1)
+		if (hashmap->data[curr].key == key && hashmap->data[curr].in_use == 1)
 			return curr;
 
 		curr = (curr + 1) % hashmap->table_size;
@@ -54,8 +54,8 @@ int hashmap_rehash(hashmap_t hashmap)
 	hashmap_element* curr;
 
 	/* Setup the new elements */
-	hashmap_map *newHashmap = (hashmap_map *) hashmap;	
-	hashmap_element* temp = (hashmap_element *) calloc(2 * newHashmap->table_size, sizeof(hashmap_element));
+	hashmap_t *newHashmap = (hashmap_t) hashmap;	
+	hashmap_item_t temp = (hashmap_item_t) calloc(2 * newHashmap->table_size, sizeof(hashmap_element));
 	if(!temp) 
 		return -1;
 
@@ -64,15 +64,15 @@ int hashmap_rehash(hashmap_t hashmap)
 	newHashmap->data = temp;
 
 	/* Update the size */
-	old_size = m->table_size;
+	old_size = newHashmap->table_size;
 	newHashmap->table_size = 2 * newHashmap->table_size;
 	newHashmap->size = 0;
 
 	/* Rehash the elements */
-	for(i = 0; i < old_size; i++)
+	for (i = 0; i < old_size; i++)
 	{
 		int status = hashmap_put(newHashmap, curr[i].key, curr[i].data);
-		if (status != MAP_OK)	
+		if (status != 0)	
 			return status;
 	}
 
@@ -139,7 +139,7 @@ int hashmap_get_one(hashmap_t hashmap, hashmap_item_t *arg, int remove)
 	for (i = 0; i< hashmap->table_size; i++)
 		if (hashmap->data[i].in_use != 0)
 		{
-			*arg = (any_t) (hashmap->data[i].data);
+			*arg = (hashmap_item_t) (hashmap->data[i].data);
 			if (remove) 
 			{
 				hashmap->data[i].in_use = 0;
@@ -159,7 +159,7 @@ int hashmap_remove(hashmap_t hashmap, int key)
 
 	curr = hashmap_hash_int(hashmap, key);
 
-	for (i = 0; i< hashmap->table_size; i++)
+	for (i = 0; i < hashmap->table_size; i++)
 	{
 		if(hashmap->data[curr].key == key && hashmap->data[curr].in_use == 1)
 		{

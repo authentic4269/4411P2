@@ -133,9 +133,7 @@ linkedList_free(linkedList_t linkedList) {
  */
 int linkedList_isEmpty(linkedList_t linkedList)
 {
-	if (linkedList == NULL)
-		return 0;
-	return (linkedList->size == 0);
+	return (linkedList == NULL);
 }
 
 /*
@@ -143,11 +141,11 @@ int linkedList_isEmpty(linkedList_t linkedList)
  */
 int
 linkedList_length(linkedList_t linkedList) {
-	//If queue exists
-	if (linkedList == NULL)
-		return 0;
+	//If queue is not empty
+	if (!linkedList_isEmpty(linkedList))
+		return linkedList->size;
 	//else 
-	return linkedList->size;
+	return 0;
 }
 
 /*

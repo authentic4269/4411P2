@@ -15,7 +15,7 @@ struct linkedListNode {
 //linkedList
 struct linkedList { 
 	int size; //Size of linkedList
-	struct queueNode *front; //First linkedList in queue
+	struct linkedListNode *front; //First linkedList in queue
 };
 
 /*
@@ -54,7 +54,7 @@ linkedList_insert(linkedList_t linkedList, void* item) {
 		while (temp->next != NULL)
 			temp = temp->next;
 
-
+		temp->next = listNode;
 
 		//Reflect that linkedList grew in size
 		linkedList->size++;
@@ -115,7 +115,7 @@ linkedList_free(linkedList_t linkedList) {
 			frontNode = frontNode->next;
 			free(tempNode);							
 		}
-		free(queue);
+		free(linkedList);
 		return 0;
 	}
 	//else 

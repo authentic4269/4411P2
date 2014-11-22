@@ -43,6 +43,8 @@ static minithread_t runningThread;
 //Used to set Thread ID
 int threadId = 0;
 
+//Used to set id of outgoing ROUTING_DISCOVERY/REPLY packets
+
 //Queue of all READY Threads
 static multilevel_queue_t multiqueue;
 
@@ -413,11 +415,13 @@ void network_handler(network_interrupt_arg_t *arg) {
 	network_address_t dst;
 	network_address_t cur;
 	network_address_t src;
+	route_request_t routeData;
 	routing_header_t next;
 	char **reversed_path;
 	int i;
 	short success = 0;
 	unsigned int pathLen;
+	unpack_unsigned_int(incomingPktLen, header->path_len);
 	unpack_address(dst, header->destination);
 	unpack_address(src, header->path[0]);
 	unpack_unsigned_int(pathLen, header->path_len);
@@ -431,7 +435,15 @@ void network_handler(network_interrupt_arg_t *arg) {
 		}
 		else
 		{
-			for (i = 1; i < pathLen-1; i++)
+			unpack_address(cur, header->path[0]);
+			if (network_compare_address(my_addr, cur) == 0)
+			{
+				if (DEBUG) {
+					printf("error: got own data packet! dropping it\n");
+				}	
+				return;
+			}
+			for (i = 1; i < pathLen; i++)
 			{
 				unpack_address(cur, header->path[i]);
 				if (network_compare_address(my_addr, cur) == 0)
@@ -450,7 +462,13 @@ void network_handler(network_interrupt_arg_t *arg) {
 					return;
 				}
 				pack_unsigned_int(header->ttl, --i);
+				if (DEBUG) 
+					print("forwarding data packet\n");
 				network_send_pkt(cur, sizeof(routing_header), (char *) header, arg->size-sizeof(routing_header), arg->buffer+ sizeof(routing_header));
+			}
+			else
+			{
+				printf("failed to forward data packet\n");
 			}
 		}
 	}
@@ -458,11 +476,17 @@ void network_handler(network_interrupt_arg_t *arg) {
 	{
 		if (network_compare_addresses(my_addr, dst) == 0) 
 		{
-			
+			memcpy(header->destination, header->path[0], 8);
+			pack_address(, header->path[0])
 			reversed_path = reverse_path(header->path, MAX_ROUTE_LENGTH, 8);
 			miniroute_cache(reversed_path, MAX_ROUTE_LENGTH, 8);
-			header->
-			
+			header->path = reversed_path;
+			pack_unsigned_int(header->path_len, (1 + pathLen)); 
+			pack_unsigned_int(header->ttl, MAX_ROUTE_LENGTH);
+			header->routing_packet_type = ROUTING_ROUTE_REPLY;
+			if (DEBUG) printf("Discovered by remote host!\n");
+			network_send_pkt(arg->sender, sizeof(routing_header), header, arg->length - sizeof(routing_header),
+				arg->buffer + sizeof(routing_header)); 
 		}
 		else if (network_compare_addresses(my_addr, src) == 0)
 		{
@@ -471,19 +495,46 @@ void network_handler(network_interrupt_arg_t *arg) {
 		} 
 		else
 		{
-			i = unpack_unsigned_int(header->ttl);
-			if (i == 0)
+			if (pathLen++ >= MAX_ROUTE_LENGTH)
 			{
-				printf("ttl 0, dropping packet");
+				if (DEBUG) 
+					printf("path length at maximum, dropping discovery packet\n");	
 				return;
 			}
-			pack_unsigned_int(header->ttl, --i);
-			network_send_pkt(cur, sizeof(routing_header), (char *) header, arg->size-sizeof(routing_header), arg->buffer+ sizeof(routing_header));
+			pack_address(header->path[pathLen], network_get_my_address());
+			pack_unsigned_int(header->path_len, (1 + pathLen)); 
+			i = unpack_unsigned_int(header->ttl) - 1;
+			if (i == 0)
+			{
+				if (DEBUG)
+					printf("ttl 0, dropping packet\n");
+				return;
+			}
+			
+			if (DEBUG) printf("rebroadcasting discovery packet\n");
+			pack_unsigned_int(header->ttl, i);
+			network_bkst_pkt(sizeof(routing_header), (char *) header, arg->size-sizeof(routing_header), arg->buffer+ sizeof(routing_header));
 			
 		}
 	}
 	else if (header->packet_type == ROUTING_ROUTE_REPLY)
 	{
+		
+		if (network_compare_addresses(my_addr, dst) == 0) 
+		{
+			routeRequest = (route_request_t) hashmap_get(current_discovery_requests, hash_address(src));	
+			if (routeRequest == NULL)
+			{
+				printf("");	
+			}
+		}
+		else if (network_compare_addresses(my_addr, src) == 0)
+		{
+		} 
+		else
+		{
+		}
+			
 	}
 	else 
 	{

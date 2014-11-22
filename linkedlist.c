@@ -51,6 +51,12 @@ linkedList_insert(linkedList_t linkedList, void* item) {
 		listNode->data = item;
 		listNode->next = NULL;
 
+		if (temp == NULL)
+		{
+			linkedList->front = listNode;
+			return 0;
+		}
+
 		while (temp->next != NULL)
 			temp = temp->next;
 

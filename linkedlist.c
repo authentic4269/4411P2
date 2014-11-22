@@ -213,5 +213,5 @@ linkedList_get(linkedList_t list, int id, void **item)
 		}
 		return 0;
 	}
-
+	return -1;
 }

@@ -357,6 +357,29 @@ void alarm_wakeup_semaphore(void* arg)
 	semaphore_V(semaphore);
 }
 
+void miniroute_cache(char **newroute, int l1, int l2)
+{
+	int i;
+	network_address_t *ret = (network_address_t *) malloc(sizeof(network_address_t) * l2);
+	route_data newroute = malloc(sizeof(route_data));
+	if (ret == NULL || newroute == NULL)
+	{
+		if (DEBUG)
+			printf("malloc error in add_route\n");
+		return;
+	}
+	for (i = 0; i < l1; i++)
+	{ 
+		unpack_address(ret[i], newroute[i]);
+	}
+	route_data->route = ret;
+	route_data->length = l1;
+	route_data->time_found = currentTime; 
+	semaphore_P(route_cache_semaphore);	
+	hashmap_insert(route_data_cache, newroute);
+	semaphore_V(route_cache_semaphore);
+}
+
 //Create a miniroute header
 routing_header_t new_miniroute_header(char packet_type, network_address_t dest_address, unsigned int id, unsigned int ttl, unsigned int path_len, network_address_t* path)
 {

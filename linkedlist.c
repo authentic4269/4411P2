@@ -9,6 +9,7 @@
 //Items in the linkedList
 struct linkedListNode { 
 	void* data;	//Pointer to item
+	int key;
 	struct linkedListNode* next; //Next linkedListNode in linkedList
 };
 
@@ -37,11 +38,11 @@ linkedList_new() {
 }
 
 /*
- * Append a void* to a linkedList (both specifed as parameters). Return
+ * Prepend a void* to a linkedList (both specifed as parameters). Return
  * 0 (success) or -1 (failure).
  */
 int
-linkedList_insert(linkedList_t linkedList, void* item) {
+linkedList_insert(linkedList_t linkedList, int key, void* item) {
 	linkedListNode_t listNode = (linkedListNode_t) malloc(sizeof(struct linkedListNode));
 	linkedListNode_t temp = linkedList->front;
 
@@ -49,18 +50,10 @@ linkedList_insert(linkedList_t linkedList, void* item) {
 	if (linkedList != NULL && item != NULL && listNode != NULL) 
 	{
 		listNode->data = item;
-		listNode->next = NULL;
+		listNode->key = key;
+		listNode->next = linkedList->front;
 
-		if (temp == NULL)
-		{
-			linkedList->front = listNode;
-			return 0;
-		}
-
-		while (temp->next != NULL)
-			temp = temp->next;
-
-		temp->next = listNode;
+		linkedList->front = listNode;
 
 		//Reflect that linkedList grew in size
 		linkedList->size++;
@@ -133,7 +126,7 @@ linkedList_free(linkedList_t linkedList) {
  */
 int linkedList_isEmpty(linkedList_t linkedList)
 {
-	return (linkedList == NULL);
+	return (linkedList == NULL || linkedList->size == 0);
 }
 
 /*
@@ -142,7 +135,7 @@ int linkedList_isEmpty(linkedList_t linkedList)
 int
 linkedList_length(linkedList_t linkedList) {
 	//If queue is not empty
-	if (!linkedList_isEmpty(linkedList))
+	if (linkedList != NULL)
 		return linkedList->size;
 	//else 
 	return 0;
@@ -153,19 +146,19 @@ linkedList_length(linkedList_t linkedList) {
  * Return 0 on success. Return -1 on error.
  */
 int
-linkedList_delete(linkedList_t linkedList, void* item) {
+linkedList_delete(linkedList_t linkedList, int id) {
 	linkedListNode_t nodeToDelete;
-	linkedListNode_t lastPtr;
+	linkedListNode_t lastPtr = NULL;
 	linkedListNode_t currentPtr;
 	
-	if (linkedList != NULL && item != NULL)
+	if (linkedList != NULL)
 	{	
 		currentPtr = linkedList->front;
 
 		while (currentPtr != NULL)
 		{	
 			//Item Found
-			if(currentPtr->data == item)
+			if(currentPtr->key == id)
 			{		
 				if (lastPtr != NULL)
 					lastPtr->next = currentPtr->next;
@@ -189,6 +182,36 @@ linkedList_delete(linkedList_t linkedList, void* item) {
 		}
 		return 0;
 	}
-	//else
 	return -1;
+}
+
+int
+linkedList_get(linkedList_t list, int id, void **item)
+{
+	linkedListNode_t nodeToDelete;
+	linkedListNode_t lastPtr = NULL;
+	linkedListNode_t currentPtr;
+	
+	if (list != NULL)
+	{	
+		currentPtr = list->front;
+
+		while (currentPtr != NULL)
+		{	
+			//Item Found
+			if(currentPtr->key == id)
+			{		
+				*item = currentPtr->data;
+				return 1;
+			}
+			//Item not found
+			else 
+			{
+				lastPtr = currentPtr;
+				currentPtr = currentPtr->next;
+			}
+		}
+		return 0;
+	}
+
 }

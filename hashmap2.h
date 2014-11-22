@@ -1,13 +1,13 @@
 #ifndef __HASHMAP_H__
 #define __HASHMAP_H__
-
+#include "linkedlist.h"
 typedef struct hashmap_item* hashmap_item_t;
 typedef struct hashmap* hashmap_t;
 
 struct hashmap_item {
 	int key;
 	int in_use;
-	void *data;
+	linkedList_t list;
 };
 
 struct hashmap {

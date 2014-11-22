@@ -365,7 +365,7 @@ void alarm_wakeup_semaphore(void* arg)
 	semaphore_V(semaphore);
 }
 
-network_address_t* miniroute_cache(char (*newroute)[8], int l1, network_address_t sender)
+network_address_t* miniroute_cache(char *newroute, int l1, network_address_t sender)
 {
 	int i;
 	network_address_t *ret = (network_address_t *) malloc(sizeof(network_address_t) * 8);
@@ -378,7 +378,7 @@ network_address_t* miniroute_cache(char (*newroute)[8], int l1, network_address_
 	}
 	for (i = 0; i < l1; i++)
 	{ 
-		unpack_address(newroute[i], ret[i]);
+		unpack_address(newroute + i*8, ret[i]);
 	}
 	new_cache_entry->route = ret;
 	new_cache_entry->length = l1;

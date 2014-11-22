@@ -1,46 +1,41 @@
 #ifndef __HASHMAP_H__
 #define __HASHMAP_H__
-
-#include <stdio.h>
-#include <string.h>
-
+#include "linkedlist.h"
 typedef struct hashmap_item* hashmap_item_t;
 typedef struct hashmap* hashmap_t;
 
 struct hashmap_item {
-	unsigned int key;
-	void* value;
-	hashmap_item_t prev;
-	hashmap_item_t next;
+	int key;
+	int in_use;
+	linkedList_t list;
 };
 
 struct hashmap {
-	int size;
-	int items;
-	int resizable;
-	hashmap_item_t* data;
-	hashmap_item_t first;
-	hashmap_item_t last;
+	  int table_size;
+	  int size;
+	  hashmap_item_t *data;
 };
 
-//Create hashmap with space for int size items
-hashmap_t hashmap_new(int size, int resizable);
+// Return an empty hashmap. Returns NULL if empty.
+hashmap_t hashmap_new();
 
-//Destroy hashmap
-void hashmap_destroy(hashmap_t map);
+//Add an element to the hashmap. Return 0 or -1.
+int hashmap_insert(hashmap_t hashmap, int key, void *data);
 
-//Get key of hashmap item
-unsigned int item_get_key(hashmap_item_t item);
+//Get an element from the hashmap. Return 0 or -1.
+int hashmap_get(hashmap_t hashmap, int key, void *data);
 
-//Get value of hashmap item
-void* item_get_value(hashmap_item_t item);
+//Remove an element from the hashmap. Return 0 or -1.
+int hashmap_delete(hashmap_t hashmap, int key);
 
-//Insert key, value pair into hashmap
-int hashmap_insert(hashmap_t hashmap, unsigned int key, void* value);
+//Get any element. Return 0 or -1. remove - should the element be removed from the hashmap
+//int hashmap_get_one(hashmap_t hashmap, hashmap_item_t *arg, int remove);
 
-void* hashmap_get(hashmap_t hashmap, unsigned int key);
 
-//Delete key from hashmap. Return -1 on error
-int hashmap_delete(hashmap_t hashmap, unsigned int key);
+//Free hashmap
+void hashmap_destroy(hashmap_t hashmap);
+
+//Get current size of a hashmap
+int hashmap_length(hashmap_t hashmap);
 
 #endif /*__HASHMAP_H_*/

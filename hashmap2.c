@@ -11,7 +11,7 @@ hashmap_t hashmap_new()
 	if(hashmap == NULL) 
 		return NULL;
 
-	hashmap->data = (hashmap_item_t) calloc(INITIAL_SIZE, sizeof(hashmap_item));
+	hashmap->data = (hashmap_item_t *) malloc(INITIAL_SIZE * sizeof(hashmap_item));
 	if(hashmap->data == NULL)
 		return NULL;
 

@@ -42,7 +42,7 @@ OBJ =                              \
     minisocket.o                   \
     miniroute.o                    \
     multilevel_queue.o             \
-    hashmap.o			   \
+    hashmap2.o			   \
     network.o
 
 %: %.o start.o end.o $(OBJ) $(SYSTEMOBJ)

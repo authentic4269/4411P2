@@ -394,19 +394,16 @@ void handle_data_packet(network_interrupt_arg_t *arg) {
 
 }
 
-char** reverse_path(char (*path)[8], int len1) {
+char* reverse_path(char (*path)[8], int len1) {
 	int i, j;
-	char **ret = (char **) malloc(sizeof(char *) * len1);
+	char *ret = (char *) malloc(sizeof(char *) * len1 * 8);
 	if (ret == NULL)
 		return NULL;
 	for (i = 0; i < len1; i++)
 	{
-		ret[i] = (char *) malloc(sizeof(char *) * 8);
-		if (ret[i] == NULL)
-			return NULL;
 		for (j = 0; j < 8; j++)
 		{
-			ret[len1-i-1][j] = path[i][j];
+			ret[(len1-i-1)*8 + j] = path[i][j];
 		}
 	}
 	return ret;
@@ -420,7 +417,7 @@ void network_handler(network_interrupt_arg_t *arg) {
 	network_address_t src;
 	network_address_t *unpacked_path;
 	char temporary_buffer[MAX_NETWORK_PKT_SIZE];
-	char **reversed_path;
+	char *reversed_path;
 	int i;
 	short success = 0;
 	unsigned int pathLen;
@@ -483,6 +480,7 @@ void network_handler(network_interrupt_arg_t *arg) {
 		{
 			memcpy(header->destination, header->path[0], 8);
 			reversed_path = reverse_path(header->path, MAX_ROUTE_LENGTH);
+			// This is a little hacky, miniroute_cache unpacks the path anyway so its convenient to not write unpack_path as a separate method
 			unpacked_path = miniroute_cache(reversed_path, MAX_ROUTE_LENGTH, src);
 			for(i = 0; i < MAX_ROUTE_LENGTH; i++)
 				pack_address(header->path[i], unpacked_path[i]);

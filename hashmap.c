@@ -1,202 +1,193 @@
-/* 
- * A linear probing hashmap.
- *
- * This hashmap maintains all inserts as a linked list and stores the clock time
- * that each entry was inserted. This hashmap supports resizing and a static cache size.
- */
-
-#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include "hashmap.h"
+#include <stdio.h>
+#include "hashmap2.h"
 
-#define LOAD_FACTOR 0.5
+#define INITIAL_SIZE 64
 
-//Create hashmap with space for int size items
-hashmap_t hashmap_new(int size, int resizable)
+//Return an empty hashmap, or NULL on failure.
+hashmap_t hashmap_new() 
 {
-	hashmap_t newHashmap = (hashmap_t) malloc(sizeof(struct hashmap));
-	int i;
-	newHashmap->size = size;
-	newHashmap->items = 0;
-	newHashmap->resizable = resizable;
-	newHashmap->data = calloc(size, sizeof(hashmap_item_t));
-	newHashmap->first = NULL;
-	newHashmap->last = NULL;
+	hashmap_t hashmap = (hashmap_t) malloc(sizeof(hashmap));
+	if(hashmap == NULL) 
+		return NULL;
 
-	for (i = 0; i < size; i++)
-		newHashmap->data[i] = NULL;
+	hashmap->data = (hashmap_item_t *) malloc(INITIAL_SIZE * sizeof(hashmap_item));
+	if(hashmap->data == NULL)
+		return NULL;
 
-	return newHashmap;
+	hashmap->table_size = INITIAL_SIZE;
+	hashmap->size = 0;
+
+	return hashmap;
 }
 
-//Destroy hashmap
-void hashmap_destroy(hashmap_t hashmap)
+//Return the integer of the location in data to store the point to the item, or -1.
+int hashmap_hash(hashmap_t hashmap, int key)
+{
+	int curr;
+	int i;
+
+	if (hashmap->size == hashmap->table_size) 
+		return -1;
+
+	curr = hashmap_hash_int(hashmap, key);
+
+	for (i = 0; i< hashmap->table_size; i++)
+	{
+		if (hashmap->data[curr]->in_use == 0)
+			return curr;
+
+		if (hashmap->data[curr]->key == key && hashmap->data[curr]->in_use == 1)
+			return curr;
+
+		curr = (curr + 1) % hashmap->table_size;
+	}
+
+	return -1;
+}
+
+//Doubles the size of the hashmap, and rehashes all the elements
+int hashmap_rehash(hashmap_t hashmap)
 {
 	int i;
-	//Free items
-	for (i = 0; i < hashmap->size; i++)
-		if (hashmap->data[i] != NULL)
-			free(hashmap->data[i]);
+	int old_size;
+	hashmap_element* curr;
 
-	//Free data struct
+	/* Setup the new elements */
+	hashmap_t *newHashmap = (hashmap_t) hashmap;	
+	hashmap_item_t temp = (hashmap_item_t) calloc(2 * newHashmap->table_size, sizeof(hashmap_item));
+	if(!temp) 
+		return -1;
+
+	/* Update the array */
+	curr = newHashmap->data;
+	newHashmap->data = temp;
+
+	/* Update the size */
+	old_size = newHashmap->table_size;
+	newHashmap->table_size = 2 * newHashmap->table_size;
+	newHashmap->size = 0;
+
+	/* Rehash the elements */
+	for (i = 0; i < old_size; i++)
+	{
+		int status = hashmap_put(newHashmap, curr[i]->key, curr[i]->data);
+		if (status != 0)	
+			return status;
+	}
+
+	free(curr);
+
+	return 0;
+}
+
+//Add a pointer to the hashmap with some key
+int hashmap_insert(hashmap_t hashmap, int key, hashmap_item_t value)
+{
+	int index = hashmap_hash(hashmap, key);
+
+	while(index == -1)
+	{
+		if (hashmap_rehash(hashmap) == -1) 
+			return -1;
+		index = hashmap_hash(hashmap, key);
+	}
+
+	hashmap->data[index]->data = value;
+	hashmap->data[index]->key = key;
+	hashmap->data[index]->in_use = 1;
+	hashmap->size++; 
+
+	return 0;
+}
+
+//Get your pointer out of the hashmap with a key
+int hashmap_get(hashmap_t hashmap, int key, hashmap_item_t *arg)
+{
+	int curr;
+	int i;
+
+	curr = hashmap_hash_int(hashmap, key);
+
+	for (i = 0; i< hashmap->table_size; i++)
+	{
+		if (hashmap->data[curr]->key == key && hashmap->data[curr]->in_use == 1)
+		{
+			*arg = (int *) (hashmap->data[curr]->data);
+			return 0;
+		}
+
+		curr = (curr + 1) % hashmap->table_size;
+	}
+
+	*arg = NULL;
+
+	//Not found
+	return -1;
+}
+
+/*
+ * Get a random element from the hashmap
+ */
+int hashmap_get_one(hashmap_t hashmap, hashmap_item_t *arg, int remove)
+{
+	int i;
+
+	if (hashmap_length(hashmap) <= 0) 	
+		return -1;
+
+	for (i = 0; i< hashmap->table_size; i++)
+		if (hashmap->data[i]->in_use != 0)
+		{
+			*arg = (hashmap_item_t) (hashmap->data[i]->data);
+			if (remove) 
+			{
+				hashmap->data[i]->in_use = 0;
+				hashmap->size--;
+			}
+			return 0;
+		}
+
+	return 0;
+}
+
+//Remove an element with that key from the map, 0 on success, -1 on fail
+int hashmap_delete(hashmap_t hashmap, int key)
+{
+	int i;
+	int curr;
+
+	curr = hashmap_hash_int(hashmap, key);
+
+	for (i = 0; i < hashmap->table_size; i++)
+	{
+		if(hashmap->data[curr]->key == key && hashmap->data[curr]->in_use == 1)
+		{
+			hashmap->data[curr]->in_use = 0;
+			hashmap->data[curr]->data = NULL;
+			hashmap->data[curr]->key = 0;
+
+			hashmap->size--;
+			return 0;
+		}
+		curr = (curr + 1) % hashmap->table_size;
+	}
+
+	return -1;
+}
+
+//Deallocate the hashmap
+void hashmap_destroy(hashmap_t hashmap)
+{
 	free(hashmap->data);
 	free(hashmap);
 }
 
-//Determine the next index to insert the item
-int find_insert_index(hashmap_t hashmap, unsigned int key)
+//Return the length of the hashmap
+int hashmap_length(hashmap_t hashmap)
 {
-	int hash = key % hashmap->size;
-	int i;
-
-	for (i = 0; i < hashmap->size; i++)
-		if (hashmap->data[(hash+i)%hashmap->size] == NULL || hashmap->data[(hash+i)%hashmap->size]->key == key)
-			return (hash+i)%(hashmap->size);
-
-	//unable to find
-	return -1;
-}
-
-//Get item associated with a key in the hashmap
-void* hashmap_get(hashmap_t hashmap, unsigned int key)
-{
-	int index = find_insert_index(hashmap, key);
-
-	if (index != -1 && hashmap->data[index] != NULL)
-		return hashmap->data[index]->value;
-
-	//Item not found
-	return NULL;
-}
-
-//Get key of hashmap item
-unsigned int item_get_key(hashmap_item_t item)
-{
-	return item->key;
-}
-
-//Get value of hashmap item
-void* item_get_value(hashmap_item_t item)
-{
-	return item->value;
-}
-
-//Insert key, value pair into hashmap
-int hashmap_insert(hashmap_t hashmap, unsigned int key, void* value)
-{
-	int index;
-	int oldSize;
-	int i;
-	hashmap_item_t item;
-	hashmap_item_t* oldItems;
-
-	if ((hashmap->items+1)/hashmap->size > LOAD_FACTOR)
-	{
-		if (hashmap->resizable == 0)
-		{
-			if (hashmap->items == hashmap->size)
-				return -1;
-		}
-		else
-		{
-			oldSize = hashmap->size;
-			oldItems = hashmap->data;
-
-			hashmap->size *= 2;
-			hashmap->data = (hashmap_item_t*) calloc(hashmap->size, sizeof(struct hashmap));
-			hashmap->first = NULL;
-			hashmap->last = NULL;
-
-			for (i = 0; i < oldSize; i++)
-			{
-				if (oldItems[i] != NULL)
-				{
-					index = find_insert_index(hashmap, oldItems[i]-> key);
-					hashmap->data[index] = oldItems[i];
-				}
-			}
-
-			free(oldItems);
-		}
-	}
-
-	index = find_insert_index(hashmap, key);
-
-	if (index == -1)
-		return -1;
-
-	if (hashmap->data[index] == NULL)
-		hashmap->items++;
-	else
-	{
-		free(hashmap->data[index]->value);
-		hashmap->data[index]->value = value;
+	if (hashmap != NULL) 
+		return hashmap->size;
+	else 
 		return 0;
-	}
-
-	//Make new hashmap
-	item = (hashmap_item_t) malloc(sizeof(struct hashmap_item));
-	item->prev = hashmap->last;
-	item->next = NULL;
-	item->key = key;
-
-	if (hashmap->items == 1)
-		hashmap->first = item;
-
-	hashmap->last = item;
-
-	return 0;
-}
-
-//Delete key from hashmap
-int hashmap_delete(hashmap_t hashmap, unsigned int key)
-{
-	int index = find_insert_index(hashmap, key);
-	int foundItem = -1;
-	int indexSearch;
-
-	if (index == -1 || hashmap->data[index] == NULL)
-		return -1;
-
-	if (hashmap->data[index] == hashmap->first)
-		hashmap->first = hashmap->first->next;
-
-	if (hashmap->data[index] == hashmap->last)
-		hashmap->last = hashmap->last->prev;
-
-	if (hashmap->data[index]->next != NULL)
-		hashmap->data[index]->next->prev = hashmap->data[index]->prev;
-
-	if (hashmap->data[index]->prev != NULL)
-		hashmap->data[index]->prev->next = hashmap->data[index]->prev;
-
-	free(hashmap->data[index]);
-	hashmap->data[index] = NULL;
-
-	while (foundItem != -1)
-	{
-		foundItem = -1;
-		indexSearch = (index + 1) % hashmap->size;
-
-		while (indexSearch != index && hashmap->data[indexSearch] != NULL)
-		{
-			if (hashmap->data[indexSearch]->key % hashmap->size <= index)
-				foundItem = indexSearch;
-			indexSearch = (indexSearch + 1) % hashmap->size;
-		}
-
-		if (foundItem != -1)
-		{
-			hashmap->data[index] = hashmap->data[foundItem];
-			hashmap->data[foundItem] = NULL;
-			//index = foundItem;
-		}
-
-		index = foundItem; //I think this goes here could go above
-	}
-
-	hashmap->items--;
-
-	return 0;
 }

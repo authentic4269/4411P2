@@ -2,6 +2,7 @@
  *	Implementation of minisockets.
  */
 #include "minithread.h"
+#include "miniroute.h"
 #include "minisocket.h"
 #include "interrupts.h"
 #include "alarm.h"

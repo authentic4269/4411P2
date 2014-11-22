@@ -323,13 +323,13 @@ minithread_sleep_with_timeout(int delay)
 }
 
 
-void handle_data_packet(network_interrupt_arg_t arg) {
+void handle_data_packet(network_interrupt_arg_t *arg) {
 	minisocket_t incomingSocket;
 	mini_header_reliable_t reliable_header;
 	miniport_t incomingPort;
 	unsigned int ack;
 	unsigned int seq;
-	header = (mini_header_t) arg->buffer; 
+	mini_header_t header = (mini_header_t) arg->buffer; 
 	if (header->protocol == PROTOCOL_MINIDATAGRAM)
 	{
 		incomingPort = miniport_get_unbound(unpack_unsigned_short(header->destination_port));
@@ -339,7 +339,7 @@ void handle_data_packet(network_interrupt_arg_t arg) {
 			printf("packet dropped like it's hot\n");
 			return;
 		}
-  		queue_append(incomingPort->port_data.unbound.data_queue, arg);
+  		queue_append(incomingPort->port_data.unbound.data_queue, (void *) arg);
 		semaphore_V(incomingPort->port_data.unbound.data_available);
 	}
 	else 
@@ -394,14 +394,17 @@ void handle_data_packet(network_interrupt_arg_t arg) {
 
 }
 
-char** reverse_path(char **path, int len1, int len2) {
+char** reverse_path(char (*path)[8], int len1) {
 	int i, j;
-	char **ret = (char **) malloc(len1 * len2);
+	char **ret = (char **) malloc(sizeof(char *) * len1);
 	if (ret == NULL)
 		return NULL;
 	for (i = 0; i < len1; i++)
 	{
-		for (j = 0; j < len2; j++)
+		ret[i] = (char *) malloc(sizeof(char *) * 8);
+		if (ret[i] == NULL)
+			return NULL;
+		for (j = 0; j < 8; j++)
 		{
 			ret[len1-i-1][j] = path[i][j];
 		}
@@ -411,32 +414,34 @@ char** reverse_path(char **path, int len1, int len2) {
 
 void network_handler(network_interrupt_arg_t *arg) {
 	routing_header_t header = (routing_header_t) arg->buffer;	
-	network_address_t my_addr = network_get_my_address();
+	network_address_t my_addr;
 	network_address_t dst;
 	network_address_t cur;
 	network_address_t src;
-	route_request_t routeData;
-	routing_header_t next;
+	network_address_t *unpacked_path;
+	char temporary_buffer[MAX_NETWORK_PKT_SIZE];
 	char **reversed_path;
 	int i;
 	short success = 0;
 	unsigned int pathLen;
-	unpack_unsigned_int(incomingPktLen, header->path_len);
-	unpack_address(dst, header->destination);
-	unpack_address(src, header->path[0]);
-	unpack_unsigned_int(pathLen, header->path_len);
+	network_get_my_address(my_addr);
+	pathLen = unpack_unsigned_int(header->path_len);
+	unpack_address(header->destination, dst);
+	unpack_address(header->path[0], src);
 	if (header->routing_packet_type == ROUTING_DATA)
 	{
-		if (network_compare_addresses(my_addr, dst) == 0) 
+		if (network_compare_network_addresses(my_addr, dst) == 0) 
 		{
-			arg->buffer = arg->buffer + sizeof(routing_header);
-			arg->size = arg->size - sizeof(routing_header);
+			// before passing to handle_data_packet, need to chop off the routing header
+			arg->size = arg->size - sizeof(struct routing_header);
+			memcpy((void *) temporary_buffer, (void *) arg->buffer + sizeof(struct routing_header), arg->size);
+			memcpy((void *) arg->buffer, temporary_buffer, arg->size);
 			handle_data_packet(arg);
 		}
 		else
 		{
-			unpack_address(cur, header->path[0]);
-			if (network_compare_address(my_addr, cur) == 0)
+			unpack_address(header->path[0], cur);
+			if (network_compare_network_addresses(my_addr, cur) == 0)
 			{
 				if (DEBUG) {
 					printf("error: got own data packet! dropping it\n");
@@ -445,10 +450,10 @@ void network_handler(network_interrupt_arg_t *arg) {
 			}
 			for (i = 1; i < pathLen; i++)
 			{
-				unpack_address(cur, header->path[i]);
-				if (network_compare_address(my_addr, cur) == 0)
+				unpack_address(header->path[i], cur);
+				if (network_compare_network_addresses(my_addr, cur) == 0)
 				{
-					unpack_address(cur, header->path[i+1]);
+					unpack_address(header->path[i+1], cur);
 					success = 1;
 					break;
 				}
@@ -463,8 +468,8 @@ void network_handler(network_interrupt_arg_t *arg) {
 				}
 				pack_unsigned_int(header->ttl, --i);
 				if (DEBUG) 
-					print("forwarding data packet\n");
-				network_send_pkt(cur, sizeof(routing_header), (char *) header, arg->size-sizeof(routing_header), arg->buffer+ sizeof(routing_header));
+					printf("forwarding data packet\n");
+				network_send_pkt(cur, sizeof(struct routing_header), (char *) header, arg->size-sizeof(struct routing_header), arg->buffer+ sizeof(struct routing_header));
 			}
 			else
 			{
@@ -472,23 +477,23 @@ void network_handler(network_interrupt_arg_t *arg) {
 			}
 		}
 	}
-	else if (header->packet_type == ROUTING_ROUTE_DISCOVERY) 
+	else if (header->routing_packet_type == ROUTING_ROUTE_DISCOVERY) 
 	{
-		if (network_compare_addresses(my_addr, dst) == 0) 
+		if (network_compare_network_addresses(my_addr, dst) == 0) 
 		{
 			memcpy(header->destination, header->path[0], 8);
-			pack_address(, header->path[0])
-			reversed_path = reverse_path(header->path, MAX_ROUTE_LENGTH, 8);
-			miniroute_cache(reversed_path, MAX_ROUTE_LENGTH, 8);
-			header->path = reversed_path;
+			reversed_path = reverse_path(header->path, MAX_ROUTE_LENGTH);
+			unpacked_path = miniroute_cache(reversed_path, MAX_ROUTE_LENGTH, src);
+			for(i = 0; i < MAX_ROUTE_LENGTH; i++)
+				pack_address(header->path[i], unpacked_path[i]);
 			pack_unsigned_int(header->path_len, (1 + pathLen)); 
 			pack_unsigned_int(header->ttl, MAX_ROUTE_LENGTH);
 			header->routing_packet_type = ROUTING_ROUTE_REPLY;
 			if (DEBUG) printf("Discovered by remote host!\n");
-			network_send_pkt(arg->sender, sizeof(routing_header), header, arg->length - sizeof(routing_header),
-				arg->buffer + sizeof(routing_header)); 
+			network_send_pkt(arg->sender, sizeof(struct routing_header), (char *) header, arg->size - sizeof(struct routing_header), 
+				(char *) arg->buffer + sizeof(struct routing_header)); 
 		}
-		else if (network_compare_addresses(my_addr, src) == 0)
+		else if (network_compare_network_addresses(my_addr, src) == 0)
 		{
 			printf("received own discovery packet, dropping it\n");
 			return;
@@ -501,7 +506,7 @@ void network_handler(network_interrupt_arg_t *arg) {
 					printf("path length at maximum, dropping discovery packet\n");	
 				return;
 			}
-			pack_address(header->path[pathLen], network_get_my_address());
+			pack_address(header->path[pathLen], my_addr);
 			pack_unsigned_int(header->path_len, (1 + pathLen)); 
 			i = unpack_unsigned_int(header->ttl) - 1;
 			if (i == 0)
@@ -513,24 +518,24 @@ void network_handler(network_interrupt_arg_t *arg) {
 			
 			if (DEBUG) printf("rebroadcasting discovery packet\n");
 			pack_unsigned_int(header->ttl, i);
-			network_bkst_pkt(sizeof(routing_header), (char *) header, arg->size-sizeof(routing_header), arg->buffer+ sizeof(routing_header));
+			network_bcast_pkt(sizeof(struct routing_header), (char *) header, arg->size-sizeof(struct routing_header), arg->buffer+ sizeof(struct routing_header));
 			
 		}
 	}
-	else if (header->packet_type == ROUTING_ROUTE_REPLY)
+	else if (header->routing_packet_type == ROUTING_ROUTE_REPLY)
 	{
 		
-		if (network_compare_addresses(my_addr, dst) == 0) 
+		if (network_compare_network_addresses(my_addr, dst) == 0) 
 		{
 			miniroute_recieve_reply(src, arg);	
 		}
-		else if (network_compare_addresses(my_addr, src) == 0)
-		{
-			printf("recieved own routing reply, error\n");
-		} 
 		else
 		{
-			unpack_unsigned_int(i, header->ttl);
+			if (network_compare_network_addresses(my_addr, src) == 0)
+			{
+				printf("recieved own routing reply, this is an error unless you're sending packets to the local machine\n");
+			} 
+			i = unpack_unsigned_int(header->ttl);
 			i--;
 			if (i == 0)
 			{
@@ -543,10 +548,10 @@ void network_handler(network_interrupt_arg_t *arg) {
 
 			for (i = 1; i < pathLen; i++)
 			{
-				unpack_address(cur, header->path[i]);
-				if (network_compare_address(my_addr, cur) == 0)
+				unpack_address(header->path[i], cur);
+				if (network_compare_network_addresses(my_addr, cur) == 0)
 				{
-					unpack_address(cur, header->path[i+1]);
+					unpack_address(header->path[i+1], cur);
 					success = 1;
 					break;
 				}
@@ -554,7 +559,7 @@ void network_handler(network_interrupt_arg_t *arg) {
 			if (success)
 			{
 				if (DEBUG) printf("forwarding reply packet\n");
-				network_send_pkt(cur, sizeof(routing_header), (char *) header, arg->size-sizeof(routing_header), arg->buffer+ sizeof(routing_header));
+				network_send_pkt(cur, sizeof(struct routing_header), (char *) header, arg->size-sizeof(struct routing_header), arg->buffer+ sizeof(struct routing_header));
 			}
 			else
 			{
@@ -617,6 +622,5 @@ minithread_system_initialize(proc_t mainproc, arg_t mainarg) {
 	minimsg_initialize();
 	miniroute_initialize();
 	network_initialize(network_handler);
-	network_synthetic_params(0.0, 0.0);
 	minithread_switch(idleThread->stack_top, mainThread->stack_top);	
 }

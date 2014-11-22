@@ -2,7 +2,10 @@
 #define _MINIROUTE_H_
 
 #include "minimsg.h"
-#include "hashmap.h"
+#include "hashmap2.h"
+
+extern int QUANTA;
+extern int currentTime;
 
 hashmap_t route_cache;
 hashmap_t discovery_packets_seen;
@@ -45,7 +48,7 @@ struct route_request
 	int threads_waiting;
 	semaphore_t initiator_semaphore;
 	semaphore_t waiting_semaphore;
-	network_interrupt_arg_t interrupt_arg;
+	network_interrupt_arg_t *interrupt_arg;
 };
 
 struct route_data
@@ -90,7 +93,9 @@ int miniroute_send_pkt(network_address_t dest_address, int hdr_len, char* hdr, i
  */
 unsigned int hash_address(network_address_t address);
 
-void miniroute_recieve_reply(network_address_t replier, network_interrupt_arg_t arg);	
+network_address_t* miniroute_cache(char (*newroute)[8], int l1, network_address_t sender);
+
+void miniroute_recieve_reply(network_address_t replier, network_interrupt_arg_t *arg);	
 /*
  * packages a miniroute_header
  */

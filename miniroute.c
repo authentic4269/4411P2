@@ -1,5 +1,5 @@
 #include "miniroute.h"
-#include "hashmap.h"
+#include "hashmap2.h"
 #include "interrupts.h"
 #include "alarm.h"
 #include "miniheader.h"
@@ -32,7 +32,6 @@ routing_header_t new_miniroute_header(char packet_type, network_address_t dest_a
 /* Performs any initialization of the miniroute layer, if required. */
 void miniroute_initialize()
 {
-	int i;
 	pkt_id = 0;
 	route_request_id = 0;
 	route_requests_index = 0;
@@ -56,7 +55,7 @@ void miniroute_initialize()
 //Removes entries older than 3 seconds route cache
 void purge_route_cache(void* arg)
 {
-	//Next item in linked list of hashmap entries
+	/*Next item in linked list of hashmap entries
 	hashmap_item_t nextItem;
 
 	//Store pointer to route data struct
@@ -97,11 +96,24 @@ void purge_route_cache(void* arg)
 
 	//Restart in 3 seconds
 	register_alarm(3000, &purge_route_cache, NULL);
+	*/
 }
 
-void miniroute_recieve_reply(network_address_t replier, network_interrupt_arg_t arg) 
+void miniroute_recieve_reply(network_address_t replier, network_interrupt_arg_t *arg) 
 {
-	
+	void *reply_hashmap_item = NULL;
+	route_request_t route_request;
+	int i;
+	i = hashmap_get(current_discovery_requests, hash_address(replier), reply_hashmap_item);
+	if (i < 0 || reply_hashmap_item == NULL)
+	{
+		if (DEBUG) printf("error: no listener for REPLY_ packet\n");
+		return;
+	}
+	route_request = (route_request_t) reply_hashmap_item;
+	route_request->interrupt_arg = arg;	
+	semaphore_V(route_request->initiator_semaphore);
+
 }
 
 //Free route data struct
@@ -116,12 +128,12 @@ void delete_route_data(route_data_t routeData)
  */
 int miniroute_send_pkt(network_address_t dest_address, int hdr_len, char* hdr, int data_len, char* data)
 {
-	route_data_t routeData;
+	route_data_t routeData = NULL;
 	int ticks;
 	int routeLength;
 	network_address_t* route;
 	int routeValid = 0;
-	route_request_t routeRequest;
+	route_request_t routeRequest = NULL;
 	int i;
 	int currentRequestId;
 	network_address_t myAddr;
@@ -137,7 +149,7 @@ int miniroute_send_pkt(network_address_t dest_address, int hdr_len, char* hdr, i
 
 	semaphore_P(route_cache_semaphore);
 
-	routeData = (route_data_t) hashmap_get(route_cache, hash_address(dest_address));
+	hashmap_get(route_cache, hash_address(dest_address), (void *) routeData);
 
 
 	if (routeData != NULL)
@@ -161,7 +173,7 @@ int miniroute_send_pkt(network_address_t dest_address, int hdr_len, char* hdr, i
 	if (routeValid == 0)
 	{
 		semaphore_P(route_cache_semaphore);
-		routeRequest = (route_request_t) hashmap_get(current_discovery_requests, hash_address(dest_address));
+		hashmap_get(current_discovery_requests, hash_address(dest_address), (void *) routeRequest);
 
 		if (routeRequest != NULL)
 		{
@@ -171,7 +183,7 @@ int miniroute_send_pkt(network_address_t dest_address, int hdr_len, char* hdr, i
 
 			semaphore_P(routeRequest->waiting_semaphore);
 			semaphore_P(route_cache_semaphore);
-			routeData = (route_data_t) hashmap_get(route_cache, hash_address(dest_address));
+			hashmap_get(route_cache, hash_address(dest_address), (void *) routeData);
 
 			if (routeData == NULL)
 			{
@@ -281,9 +293,6 @@ int miniroute_send_pkt(network_address_t dest_address, int hdr_len, char* hdr, i
 					delete_route_request(routeRequest);
 					hashmap_delete(current_discovery_requests, hash_address(dest_address));
 
-					free(routingHeader);
-					free(fullHeader);
-
 					success = 1;
 					break;
 				}
@@ -356,27 +365,28 @@ void alarm_wakeup_semaphore(void* arg)
 	semaphore_V(semaphore);
 }
 
-void miniroute_cache(char **newroute, int l1, int l2)
+network_address_t* miniroute_cache(char (*newroute)[8], int l1, network_address_t sender)
 {
 	int i;
-	network_address_t *ret = (network_address_t *) malloc(sizeof(network_address_t) * l2);
-	route_data_t newroute = malloc(sizeof(route_data));
-	if (ret == NULL || newroute == NULL)
+	network_address_t *ret = (network_address_t *) malloc(sizeof(network_address_t) * 8);
+	route_data_t new_cache_entry = malloc(sizeof(struct route_data));
+	if (ret == NULL || new_cache_entry == NULL)
 	{
 		if (DEBUG)
 			printf("malloc error in add_route\n");
-		return;
+		return NULL;
 	}
 	for (i = 0; i < l1; i++)
 	{ 
-		unpack_address(ret[i], newroute[i]);
+		unpack_address(newroute[i], ret[i]);
 	}
-	route_data->route = ret;
-	route_data->length = l1;
-	route_data->time_found = currentTime; 
+	new_cache_entry->route = ret;
+	new_cache_entry->length = l1;
+	new_cache_entry->time_found = currentTime; 
 	semaphore_P(route_cache_semaphore);	
-	hashmap_insert(route_data_cache, newroute);
+	hashmap_insert(route_cache, hash_address(sender), (void *) new_cache_entry);
 	semaphore_V(route_cache_semaphore);
+	return ret;
 }
 
 //Create a miniroute header

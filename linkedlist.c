@@ -207,7 +207,9 @@ linkedList_get(linkedList_t list, int id, void **item)
 				currentPtr = currentPtr->next;
 			}
 		}
+		*item = NULL;
 		return -1;
 	}
+	*item = NULL;
 	return -1;
 }

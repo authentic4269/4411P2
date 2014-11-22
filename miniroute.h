@@ -45,7 +45,7 @@ struct route_request
 	int threads_waiting;
 	semaphore_t initiator_semaphore;
 	semaphore_t waiting_semaphore;
-	network_interrupt_arg_t* interrupt_arg;
+	network_interrupt_arg_t interrupt_arg;
 };
 
 struct route_data
@@ -90,6 +90,7 @@ int miniroute_send_pkt(network_address_t dest_address, int hdr_len, char* hdr, i
  */
 unsigned int hash_address(network_address_t address);
 
+void miniroute_recieve_reply(network_address_t replier, network_interrupt_arg_t arg);	
 /*
  * packages a miniroute_header
  */

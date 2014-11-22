@@ -522,18 +522,46 @@ void network_handler(network_interrupt_arg_t *arg) {
 		
 		if (network_compare_addresses(my_addr, dst) == 0) 
 		{
-			routeRequest = (route_request_t) hashmap_get(current_discovery_requests, hash_address(src));	
-			if (routeRequest == NULL)
-			{
-				printf("current_discovery_requests doesn't contain any waiting threads\n");
-				return;	
-			}
+			miniroute_recieve_reply(src, arg);	
 		}
 		else if (network_compare_addresses(my_addr, src) == 0)
 		{
+			printf("recieved own routing reply, error\n");
 		} 
 		else
 		{
+			unpack_unsigned_int(i, header->ttl);
+			i--;
+			if (i == 0)
+			{
+				if (DEBUG)
+					printf("ttl 0, dropping packet\n");
+				return;
+			}
+			
+			pack_unsigned_int(header->ttl, i);
+
+			for (i = 1; i < pathLen; i++)
+			{
+				unpack_address(cur, header->path[i]);
+				if (network_compare_address(my_addr, cur) == 0)
+				{
+					unpack_address(cur, header->path[i+1]);
+					success = 1;
+					break;
+				}
+			} 			
+			if (success)
+			{
+				if (DEBUG) printf("forwarding reply packet\n");
+				network_send_pkt(cur, sizeof(routing_header), (char *) header, arg->size-sizeof(routing_header), arg->buffer+ sizeof(routing_header));
+			}
+			else
+			{
+				if (DEBUG) printf("failed to forward reply packet\n");
+				return;
+			}
+		
 		}
 			
 	}
@@ -587,6 +615,7 @@ minithread_system_initialize(proc_t mainproc, arg_t mainarg) {
 	miniroute_initialize();
 	minisocket_initialize();
 	minimsg_initialize();
+	miniroute_initialize();
 	network_initialize(network_handler);
 	network_synthetic_params(0.0, 0.0);
 	minithread_switch(idleThread->stack_top, mainThread->stack_top);	

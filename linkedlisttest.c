@@ -15,7 +15,7 @@ void iter(void *cur, void *ptr) {
 }	
 
 int
-main(void) {
+main(int argc, char *argv[]) {
 	void *hi = NULL;
 	void **ptr = &hi;
 	linkedList_t testlist = linkedList_new();

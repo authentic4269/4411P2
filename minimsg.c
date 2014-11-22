@@ -237,7 +237,7 @@ minimsg_send(miniport_t local_unbound_port, miniport_t local_bound_port, minimsg
 	pack_address(header->destination_address, local_bound_port->port_data.bound.remote_addr);
 	pack_unsigned_short(header->destination_port, local_bound_port->port_data.bound.remote_port_number);
 
-	ret= network_send_pkt(local_bound_port->port_data.bound.remote_addr, sizeof(struct mini_header), (char *) header, len, (char *) msg);  
+	ret= miniroute_send_pkt(local_bound_port->port_data.bound.remote_addr, sizeof(struct mini_header), (char *) header, len, (char *) msg);  
 
 	free(header);
 

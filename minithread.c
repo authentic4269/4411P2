@@ -392,19 +392,38 @@ void handle_data_packet(network_interrupt_arg_t arg) {
 
 }
 
+char** reverse_path(char **path, int len1, int len2) {
+	int i, j;
+	char **ret = (char **) malloc(len1 * len2);
+	if (ret == NULL)
+		return NULL;
+	for (i = 0; i < len1; i++)
+	{
+		for (j = 0; j < len2; j++)
+		{
+			ret[len1-i-1][j] = path[i][j];
+		}
+	}
+	return ret;
+}
+
 void network_handler(network_interrupt_arg_t *arg) {
 	routing_header_t header = (routing_header_t) arg->buffer;	
 	network_address_t my_addr = network_get_my_address();
-	network_address_t sender;
+	network_address_t dst;
 	network_address_t cur;
+	network_address_t src;
+	routing_header_t next;
+	char **reversed_path;
 	int i;
 	short success = 0;
 	unsigned int pathLen;
-	unpack_address(sender, header->destination);
+	unpack_address(dst, header->destination);
+	unpack_address(src, header->path[0]);
 	unpack_unsigned_int(pathLen, header->path_len);
 	if (header->routing_packet_type == ROUTING_DATA)
 	{
-		if (network_compare_addresses(my_addr, sender) == 0) 
+		if (network_compare_addresses(my_addr, dst) == 0) 
 		{
 			arg->buffer = arg->buffer + sizeof(routing_header);
 			arg->size = arg->size - sizeof(routing_header);
@@ -412,7 +431,7 @@ void network_handler(network_interrupt_arg_t *arg) {
 		}
 		else
 		{
-			for (i = 0; i < pathLen-1; i++)
+			for (i = 1; i < pathLen-1; i++)
 			{
 				unpack_address(cur, header->path[i]);
 				if (network_compare_address(my_addr, cur) == 0)
@@ -424,9 +443,51 @@ void network_handler(network_interrupt_arg_t *arg) {
 			} 			
 			if (success) 
 			{
-	
+				i = unpack_unsigned_int(header->ttl);
+				if (i == 0)
+				{
+					printf("ttl 0, dropping packet");
+					return;
+				}
+				pack_unsigned_int(header->ttl, --i);
+				network_send_pkt(cur, sizeof(routing_header), (char *) header, arg->size-sizeof(routing_header), arg->buffer+ sizeof(routing_header));
 			}
 		}
+	}
+	else if (header->packet_type == ROUTING_ROUTE_DISCOVERY) 
+	{
+		if (network_compare_addresses(my_addr, dst) == 0) 
+		{
+			
+			reversed_path = reverse_path(header->path, MAX_ROUTE_LENGTH, 8);
+			miniroute_cache(reversed_path, MAX_ROUTE_LENGTH, 8);
+			header->
+			
+		}
+		else if (network_compare_addresses(my_addr, src) == 0)
+		{
+			printf("received own discovery packet, dropping it\n");
+			return;
+		} 
+		else
+		{
+			i = unpack_unsigned_int(header->ttl);
+			if (i == 0)
+			{
+				printf("ttl 0, dropping packet");
+				return;
+			}
+			pack_unsigned_int(header->ttl, --i);
+			network_send_pkt(cur, sizeof(routing_header), (char *) header, arg->size-sizeof(routing_header), arg->buffer+ sizeof(routing_header));
+			
+		}
+	}
+	else if (header->packet_type == ROUTING_ROUTE_REPLY)
+	{
+	}
+	else 
+	{
+		printf("Unrecognized packet type\n");
 	}
 }
 
@@ -475,6 +536,6 @@ minithread_system_initialize(proc_t mainproc, arg_t mainarg) {
 	minisocket_initialize();
 	minimsg_initialize();
 	network_initialize(network_handler);
-	network_synthetic_params(0.0, 0.4);
+	network_synthetic_params(0.0, 0.0);
 	minithread_switch(idleThread->stack_top, mainThread->stack_top);	
 }

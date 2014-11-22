@@ -83,6 +83,8 @@ void purge_route_cache(void* arg)
 		ticks = (currentTime - routeData->time_found) * QUANTA / 3;
 		if (ticks > SECOND)
 		{
+			if (DEBUG)	
+				printf("route cache entry timed out");
 			//Delete route data struct
 			delete_route_data(routeData);
 
@@ -105,6 +107,29 @@ void delete_route_data(route_data_t routeData)
 {
 	free(routeData->route);
 	free(routeData);
+}
+
+void miniroute_cache(char **newroute, int l1, int l2)
+{
+	int i;
+	network_address_t *ret = (network_address_t *) malloc(sizeof(network_address_t) * l2);
+	route_data newroute = malloc(sizeof(route_data));
+	if (ret == NULL || newroute == NULL)
+	{
+		if (DEBUG)
+			printf("malloc error in add_route\n");
+		return;
+	}
+	for (i = 0; i < l1; i++)
+	{ 
+		unpack_address(ret[i], newroute[i]);
+	}
+	route_data->route = ret;
+	route_data->length = l1;
+	route_data->time_found = currentTime; 
+	semaphore_P(route_cache_semaphore);	
+	hashmap_insert(route_data_cache, newroute);
+	semaphore_V(route_cache_semaphore);
 }
 
 /* sends a miniroute packet, automatically discovering the path if necessary. See description in the
@@ -186,6 +211,8 @@ int miniroute_send_pkt(network_address_t dest_address, int hdr_len, char* hdr, i
 				if (ticks > SECOND)
 				{
 					semaphore_V(route_cache_semaphore);
+					if (DEBUG)	
+						printf("route cache entry timed out");
 					return -1;
 				}
 
@@ -354,8 +381,7 @@ void alarm_wakeup_semaphore(void* arg)
 }
 
 //Create a miniroute header
-routing_header_t new_miniroute_header(char packet_type, network_address_t dest_address, 
-	unsigned int id, unsigned int ttl, unsigned int path_len, network_address_t* path)
+routing_header_t new_miniroute_header(char packet_type, network_address_t dest_address, unsigned int id, unsigned int ttl, unsigned int path_len, network_address_t* path)
 {
 	routing_header_t routingHeader = (routing_header_t) malloc(sizeof(struct routing_header));
 	int i = 0;
@@ -370,8 +396,9 @@ routing_header_t new_miniroute_header(char packet_type, network_address_t dest_a
 	pack_unsigned_int(routingHeader->path_len, path_len);
 
 	for (i = 0; i < path_len; i++)
+	{
 		pack_address(routingHeader->path[i], path[i]);
-
+	}
 	return routingHeader;
 }
 

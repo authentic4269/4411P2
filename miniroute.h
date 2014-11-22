@@ -90,4 +90,9 @@ int miniroute_send_pkt(network_address_t dest_address, int hdr_len, char* hdr, i
  */
 unsigned int hash_address(network_address_t address);
 
+/*
+ * packages a miniroute_header
+ */
+routing_header_t new_miniroute_header(char packet_type, network_address_t dest_address, unsigned int id, unsigned int ttl, unsigned int path_len, network_address_t* path);
+
 #endif /* _MINIROUTE_H_ */

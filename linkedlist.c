@@ -44,7 +44,6 @@ linkedList_new() {
 int
 linkedList_insert(linkedList_t linkedList, int key, void* item) {
 	linkedListNode_t listNode = (linkedListNode_t) malloc(sizeof(struct linkedListNode));
-	linkedListNode_t temp = linkedList->front;
 
 	//Check that linkedList and item exists and that listNode was properly created
 	if (linkedList != NULL && item != NULL && listNode != NULL) 
@@ -172,6 +171,7 @@ linkedList_delete(linkedList_t linkedList, int id) {
 				linkedList->size--;
 
 				free(nodeToDelete);
+				return 0;
 			}
 			//Item not found
 			else 
@@ -180,7 +180,6 @@ linkedList_delete(linkedList_t linkedList, int id) {
 				currentPtr = currentPtr->next;
 			}
 		}
-		return 0;
 	}
 	return -1;
 }
@@ -188,8 +187,6 @@ linkedList_delete(linkedList_t linkedList, int id) {
 int
 linkedList_get(linkedList_t list, int id, void **item)
 {
-	linkedListNode_t nodeToDelete;
-	linkedListNode_t lastPtr = NULL;
 	linkedListNode_t currentPtr;
 	
 	if (list != NULL)
@@ -207,11 +204,11 @@ linkedList_get(linkedList_t list, int id, void **item)
 			//Item not found
 			else 
 			{
-				lastPtr = currentPtr;
 				currentPtr = currentPtr->next;
 			}
 		}
-		return 0;
+		return -1;
 	}
+	return -1;
 
 }

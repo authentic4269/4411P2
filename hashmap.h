@@ -1,19 +1,13 @@
 #ifndef __HASHMAP_H__
 #define __HASHMAP_H__
 #include "linkedlist.h"
-typedef struct hashmap_item* hashmap_item_t;
 typedef struct hashmap* hashmap_t;
 
-struct hashmap_item {
-	int key;
-	int in_use;
-	linkedList_t list;
-};
 
 struct hashmap {
 	  int table_size;
 	  int size;
-	  hashmap_item_t *data;
+	  linkedList_t *data;
 };
 
 // Return an empty hashmap. Returns NULL if empty.
@@ -23,7 +17,7 @@ hashmap_t hashmap_new();
 int hashmap_insert(hashmap_t hashmap, int key, void *data);
 
 //Get an element from the hashmap. Return 0 or -1.
-int hashmap_get(hashmap_t hashmap, int key, void *data);
+int hashmap_get(hashmap_t hashmap, int key, void **data);
 
 //Remove an element from the hashmap. Return 0 or -1.
 int hashmap_delete(hashmap_t hashmap, int key);

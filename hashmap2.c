@@ -34,10 +34,10 @@ int hashmap_hash(hashmap_t hashmap, int key)
 
 	for (i = 0; i< hashmap->table_size; i++)
 	{
-		if (hashmap->data[curr].in_use == 0)
+		if (hashmap->data[curr]->in_use == 0)
 			return curr;
 
-		if (hashmap->data[curr].key == key && hashmap->data[curr].in_use == 1)
+		if (hashmap->data[curr]->key == key && hashmap->data[curr]->in_use == 1)
 			return curr;
 
 		curr = (curr + 1) % hashmap->table_size;
@@ -55,7 +55,7 @@ int hashmap_rehash(hashmap_t hashmap)
 
 	/* Setup the new elements */
 	hashmap_t *newHashmap = (hashmap_t) hashmap;	
-	hashmap_item_t temp = (hashmap_item_t) calloc(2 * newHashmap->table_size, sizeof(hashmap_element));
+	hashmap_item_t temp = (hashmap_item_t) calloc(2 * newHashmap->table_size, sizeof(hashmap_item));
 	if(!temp) 
 		return -1;
 
@@ -71,7 +71,7 @@ int hashmap_rehash(hashmap_t hashmap)
 	/* Rehash the elements */
 	for (i = 0; i < old_size; i++)
 	{
-		int status = hashmap_put(newHashmap, curr[i].key, curr[i].data);
+		int status = hashmap_put(newHashmap, curr[i]->key, curr[i]->data);
 		if (status != 0)	
 			return status;
 	}
@@ -82,7 +82,7 @@ int hashmap_rehash(hashmap_t hashmap)
 }
 
 //Add a pointer to the hashmap with some key
-int hashmap_put(hashmap_t hashmap, int key, hashmap_item_t value)
+int hashmap_insert(hashmap_t hashmap, int key, hashmap_item_t value)
 {
 	int index = hashmap_hash(hashmap, key);
 
@@ -93,9 +93,9 @@ int hashmap_put(hashmap_t hashmap, int key, hashmap_item_t value)
 		index = hashmap_hash(hashmap, key);
 	}
 
-	hashmap->data[index].data = value;
-	hashmap->data[index].key = key;
-	hashmap->data[index].in_use = 1;
+	hashmap->data[index]->data = value;
+	hashmap->data[index]->key = key;
+	hashmap->data[index]->in_use = 1;
 	hashmap->size++; 
 
 	return 0;
@@ -111,9 +111,9 @@ int hashmap_get(hashmap_t hashmap, int key, hashmap_item_t *arg)
 
 	for (i = 0; i< hashmap->table_size; i++)
 	{
-		if (hashmap->data[curr].key == key && hashmap->data[curr].in_use == 1)
+		if (hashmap->data[curr]->key == key && hashmap->data[curr]->in_use == 1)
 		{
-			*arg = (int *) (hashmap->data[curr].data);
+			*arg = (int *) (hashmap->data[curr]->data);
 			return 0;
 		}
 
@@ -137,12 +137,12 @@ int hashmap_get_one(hashmap_t hashmap, hashmap_item_t *arg, int remove)
 		return -1;
 
 	for (i = 0; i< hashmap->table_size; i++)
-		if (hashmap->data[i].in_use != 0)
+		if (hashmap->data[i]->in_use != 0)
 		{
-			*arg = (hashmap_item_t) (hashmap->data[i].data);
+			*arg = (hashmap_item_t) (hashmap->data[i]->data);
 			if (remove) 
 			{
-				hashmap->data[i].in_use = 0;
+				hashmap->data[i]->in_use = 0;
 				hashmap->size--;
 			}
 			return 0;
@@ -152,7 +152,7 @@ int hashmap_get_one(hashmap_t hashmap, hashmap_item_t *arg, int remove)
 }
 
 //Remove an element with that key from the map, 0 on success, -1 on fail
-int hashmap_remove(hashmap_t hashmap, int key)
+int hashmap_delete(hashmap_t hashmap, int key)
 {
 	int i;
 	int curr;
@@ -161,11 +161,11 @@ int hashmap_remove(hashmap_t hashmap, int key)
 
 	for (i = 0; i < hashmap->table_size; i++)
 	{
-		if(hashmap->data[curr].key == key && hashmap->data[curr].in_use == 1)
+		if(hashmap->data[curr]->key == key && hashmap->data[curr]->in_use == 1)
 		{
-			hashmap->data[curr].in_use = 0;
-			hashmap->data[curr].data = NULL;
-			hashmap->data[curr].key = 0;
+			hashmap->data[curr]->in_use = 0;
+			hashmap->data[curr]->data = NULL;
+			hashmap->data[curr]->key = 0;
 
 			hashmap->size--;
 			return 0;

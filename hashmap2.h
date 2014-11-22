@@ -20,13 +20,13 @@ struct hashmap {
 hashmap_t hashmap_new();
 
 //Add an element to the hashmap. Return 0 or -1.
-int hashmap_put(hashmap_t hashmap, int key, hashmap_item_t value);
+int hashmap_insert(hashmap_t hashmap, int key, hashmap_item_t value);
 
 //Get an element from the hashmap. Return 0 or -1.
 int hashmap_get(hashmap_t hashmap, int key, hashmap_item_t *arg);
 
 //Remove an element from the hashmap. Return 0 or -1.
-int hashmap_remove(hashmap_t hashmap, int key);
+int hashmap_delete(hashmap_t hashmap, int key);
 
 //Get any element. Return 0 or -1. remove - should the element be removed from the hashmap
 int hashmap_get_one(hashmap_t hashmap, hashmap_item_t *arg, int remove);

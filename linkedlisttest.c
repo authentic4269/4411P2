@@ -32,7 +32,7 @@ main(void) {
 		printf("Dequeue test failed. Expected 0, got %d\n", **iptr);			
 	if (linkedList_delete(testlist, &b) != 0)
 		printf("Delete test failed\n");
-	queue_dequeue(testlist, ptr);
+	linkedList_dequeue(testlist, ptr);
 	iptr = (int **) ptr;
 	if (**iptr != 1)
 		printf("Delete test failed. Expected to dequeue 1, dequeued %d\n", **iptr);

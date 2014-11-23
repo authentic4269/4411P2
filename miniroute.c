@@ -173,6 +173,7 @@ int miniroute_send_pkt(network_address_t dest_address, int hdr_len, char* hdr, i
 	{
 		semaphore_P(route_cache_semaphore);
 		hashmap_get(current_discovery_requests, hash_address(dest_address), (void **) &routeRequest);
+		printf("getting address with id %d\n", hash_address(dest_address));
 
 		if (routeRequest != NULL)
 		{
@@ -328,6 +329,7 @@ int miniroute_send_pkt(network_address_t dest_address, int hdr_len, char* hdr, i
 		free(routingHeader);
 
 	network_address_copy(route[1], destAddr2);
+	printf("sending packet to address with id %d\n", hash_address(destAddr2));
 
 	network_send_pkt(destAddr2, sizeof(struct routing_header) + hdr_len, fullHeader, data_len, data);
 

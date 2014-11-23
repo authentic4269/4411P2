@@ -493,6 +493,8 @@ network_initialize(network_handler_t network_handler) {
   if_info.sin.sin_family = SOCK_DGRAM;
   if_info.sin.sin_addr.s_addr = htonl(0);
   if_info.sin.sin_port = htons(my_udp_port);
+  assert(setsockopt(if_info.sock, SOL_SOCKET, SO_REUSEADDR,
+                    (char *) &arg, sizeof(int)) == 0);
   if (bind(if_info.sock, (struct sockaddr *) &if_info.sin,
            sizeof(if_info.sin)) < 0)  {
     /* kprintf("Error: code %ld.\n", GetLastError());*/
@@ -501,9 +503,6 @@ network_initialize(network_handler_t network_handler) {
     return -1;
   }
 
-  /* set for fast reuse */
-  assert(setsockopt(if_info.sock, SOL_SOCKET, SO_REUSEADDR,
-                    (char *) &arg, sizeof(int)) == 0);
 
   if (BCAST_ENABLED)
     bcast_initialize(BCAST_TOPOLOGY_FILE, &topology);

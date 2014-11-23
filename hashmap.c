@@ -26,7 +26,12 @@ hashmap_t hashmap_new()
 }
 
 int hash_int(hashmap_t hashmap, int arg) {
-	return ((arg * (arg + 3)) % hashmap->table_size);
+	int hash = (arg * (arg + 3)) % hashmap->table_size;
+	if (hash < 0)
+		hash *= -1;
+	// it would be better if we worked with unsigned int hashes, but time is at a premium right now.
+	// so i won't change it, and will do this hack instead ;)
+	return hash;
 }
 
 

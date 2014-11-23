@@ -189,7 +189,7 @@ linkedList_get(linkedList_t list, int id, void **item)
 {
 	linkedListNode_t currentPtr;
 	
-	if (list != NULL)
+	if (list != NULL && list->size > 0)
 	{	
 		currentPtr = list->front;
 

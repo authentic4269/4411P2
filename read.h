@@ -11,4 +11,6 @@
  */
 int miniterm_read(char* buffer, int len);
 
+int miniterm_initialize();
+
 #endif /*__READ_PUBLIC_H__*/

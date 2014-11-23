@@ -21,6 +21,7 @@
 #include "synch.h"
 #include <assert.h>
 #include "alarm.h"
+#include "read.h"
 #define USER_DEBUG 1
 
 /*
@@ -616,6 +617,7 @@ minithread_system_initialize(proc_t mainproc, arg_t mainarg) {
 
 
 	minithread_clock_init(QUANTA, clock_handler);
+	miniterm_initialize();
 	miniroute_initialize();
 	minisocket_initialize();
 	minimsg_initialize();

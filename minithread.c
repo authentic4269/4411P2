@@ -429,7 +429,7 @@ void network_handler(network_interrupt_arg_t *arg) {
 	unpack_address(header->path[0], src);
 	if (header->routing_packet_type == ROUTING_DATA)
 	{
-		if (network_compare_network_addresses(my_addr, dst) == 0) 
+		if (network_compare_network_addresses(my_addr, dst) != 0) 
 		{
 			// before passing to handle_data_packet, need to chop off the routing header
 			arg->size = arg->size - sizeof(struct routing_header);
@@ -440,7 +440,7 @@ void network_handler(network_interrupt_arg_t *arg) {
 		else
 		{
 			unpack_address(header->path[0], cur);
-			if (network_compare_network_addresses(my_addr, cur) == 0)
+			if (network_compare_network_addresses(my_addr, cur) != 0)
 			{
 				if (USER_DEBUG) {
 					printf("error: got own data packet! dropping it\n");
@@ -450,7 +450,7 @@ void network_handler(network_interrupt_arg_t *arg) {
 			for (i = 1; i < pathLen; i++)
 			{
 				unpack_address(header->path[i], cur);
-				if (network_compare_network_addresses(my_addr, cur) == 0)
+				if (network_compare_network_addresses(my_addr, cur) != 0)
 				{
 					unpack_address(header->path[i+1], cur);
 					success = 1;
@@ -478,7 +478,7 @@ void network_handler(network_interrupt_arg_t *arg) {
 	}
 	else if (header->routing_packet_type == ROUTING_ROUTE_DISCOVERY) 
 	{
-		if (network_compare_network_addresses(my_addr, dst) == 0) 
+		if (network_compare_network_addresses(my_addr, dst) != 0) 
 		{
 			memcpy(header->destination, header->path[0], 8);
 			reversed_path = reverse_path(header->path, MAX_ROUTE_LENGTH);
@@ -493,7 +493,7 @@ void network_handler(network_interrupt_arg_t *arg) {
 			network_send_pkt(arg->sender, sizeof(struct routing_header), (char *) header, arg->size - sizeof(struct routing_header), 
 				(char *) arg->buffer + sizeof(struct routing_header)); 
 		}
-		else if (network_compare_network_addresses(my_addr, src) == 0)
+		else if (network_compare_network_addresses(my_addr, src) != 0)
 		{
 			printf("received own discovery packet, dropping it\n");
 			return;
@@ -525,13 +525,13 @@ void network_handler(network_interrupt_arg_t *arg) {
 	else if (header->routing_packet_type == ROUTING_ROUTE_REPLY)
 	{
 		
-		if (network_compare_network_addresses(my_addr, dst) == 0) 
+		if (network_compare_network_addresses(my_addr, dst) != 0) 
 		{
 			miniroute_recieve_reply(src, arg);	
 		}
 		else
 		{
-			if (network_compare_network_addresses(my_addr, src) == 0)
+			if (network_compare_network_addresses(my_addr, src) != 0)
 			{
 				printf("recieved own routing reply, this is an error unless you're sending packets to the local machine\n");
 			} 
@@ -549,7 +549,7 @@ void network_handler(network_interrupt_arg_t *arg) {
 			for (i = 1; i < pathLen; i++)
 			{
 				unpack_address(header->path[i], cur);
-				if (network_compare_network_addresses(my_addr, cur) == 0)
+				if (network_compare_network_addresses(my_addr, cur) != 0)
 				{
 					unpack_address(header->path[i+1], cur);
 					success = 1;

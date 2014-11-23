@@ -49,7 +49,7 @@ void miniroute_initialize()
 	request_id_semaphore = semaphore_create();
 	semaphore_initialize(request_id_semaphore, 1);
 
-	register_alarm(3000, &purge_route_cache, NULL);
+	//register_alarm(3000, &purge_route_cache, NULL);
 }
 
 //Removes entries older than 3 seconds route cache
@@ -361,7 +361,8 @@ route_request_t new_route_request()
 void alarm_wakeup_semaphore(void* arg)
 {
 	semaphore_t semaphore = (semaphore_t) arg;
-	semaphore_V(semaphore);
+	if (semaphore != NULL)
+		semaphore_V(semaphore);
 }
 
 network_address_t* miniroute_cache(char *newroute, int l1, network_address_t sender)

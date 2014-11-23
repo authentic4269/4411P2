@@ -260,7 +260,6 @@ int miniroute_send_pkt(network_address_t dest_address, int hdr_len, char* hdr, i
 
 				if (routeRequest->interrupt_arg != NULL)
 				{
-					semaphore_P(routeRequest->initiator_semaphore);
 
 					tempRoutingHeader = (routing_header_t) routeRequest->interrupt_arg->buffer;
 					routeLength = unpack_unsigned_int(tempRoutingHeader->path_len);
@@ -362,7 +361,7 @@ void alarm_wakeup_semaphore(void* arg)
 {
 	semaphore_t semaphore = (semaphore_t) arg;
 	if (semaphore != NULL)
-		semaphore_V(semaphore);
+//		semaphore_V(semaphore);
 }
 
 network_address_t* miniroute_cache(char *newroute, int l1, network_address_t sender)

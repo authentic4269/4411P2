@@ -204,7 +204,7 @@ minimsg_send(miniport_t local_unbound_port, miniport_t local_bound_port, minimsg
 {
 	mini_header_t header;
 	network_address_t myaddr;
-	int ret;
+	int ret = 1;
 
 	network_get_my_address(myaddr);
 

@@ -263,7 +263,7 @@ int miniroute_send_pkt(network_address_t dest_address, int hdr_len, char* hdr, i
 
 					tempRoutingHeader = (routing_header_t) routeRequest->interrupt_arg->buffer;
 					routeLength = unpack_unsigned_int(tempRoutingHeader->path_len);
-					route = miniroute_reverse_raw_path(tempRoutingHeader, routeLength);
+					route = miniroute_reverse_raw_path(tempRoutingHeader->path, routeLength);
 
 					if (route == NULL)
 					{
@@ -331,7 +331,6 @@ int miniroute_send_pkt(network_address_t dest_address, int hdr_len, char* hdr, i
 
 	network_send_pkt(destAddr2, sizeof(struct routing_header) + hdr_len, fullHeader, data_len, data);
 
-	free(route);
 	free(routingHeader);
 	free(fullHeader);
 

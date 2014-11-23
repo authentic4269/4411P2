@@ -28,8 +28,8 @@ int receive_first(int* arg)
   int length;
   miniport_t port;
   miniport_t sourcePort;
-  char buffer[BUFFER_SIZE];
-  char buffer2[BUFFER_SIZE];
+  char buf[BUFFER_SIZE];
+  char buf2[BUFFER_SIZE];
 
   port = miniport_create_unbound(1);
 
@@ -38,12 +38,12 @@ int receive_first(int* arg)
     length = BUFFER_SIZE;
 
     printf("\t\t(Waiting for a Friend)\n");
-    minimsg_receive(port, &sourcePort, buffer, &length);
-    printf("Friend: %s", buffer);
+    minimsg_receive(port, &sourcePort, buf, &length);
+    printf("Friend: %s", buf);
     printf("You: ");
     fflush(stdout);
-    length = miniterm_read(buffer2, BUFFER_SIZE);
-    minimsg_send(port, sourcePort, buffer2, length+1);
+    length = miniterm_read(buf2, BUFFER_SIZE);
+    minimsg_send(port, sourcePort, buf2, length+1);
     miniport_destroy(sourcePort);
   }
 
@@ -57,8 +57,8 @@ int transmit_first(int* arg)
   miniport_t port;
   miniport_t destinationPort;
   miniport_t sourcePort;
-  char buffer[BUFFER_SIZE];
-  char buffer2[BUFFER_SIZE];
+  char buf[BUFFER_SIZE];
+  char buf2[BUFFER_SIZE];
   
 
   AbortOnCondition(network_translate_hostname(hostname, addr) < 0, 
@@ -69,27 +69,28 @@ int transmit_first(int* arg)
 
   while(1)
   {
-    printf("You: ");
+    printf("Enter your message: \n");
     fflush(stdout);
-    length = miniterm_read(buffer, BUFFER_SIZE);
-    if (minimsg_send(port, destinationPort, buffer, length+1) < 0);
+    length = miniterm_read(buf, BUFFER_SIZE);
+    if (minimsg_send(port, destinationPort, buf, length+1) < 0)
 	printf("Error in minimsg_send\n");
     length = BUFFER_SIZE;
-    printf("\t\t(Waiting for a Friend)\n");
-    if (minimsg_receive(port, &sourcePort, buffer2, &length) < 0);
+    printf("Waiting for remote host...\n");
+    if (minimsg_receive(port, &sourcePort, buf2, &length) < 0)
 	printf("Error in minimsg_receive\n");
-    printf("Friend: %s", buffer2);
+    printf("Received message: %s", buf2);
     miniport_destroy(sourcePort);
   }
 
   return 0;
 }
 
-int main(int argc, char** argv) 
+int 
+main(int argc, char** argv) 
 {
-  short fromport, toport;
-  fromport = atoi(argv[1]);
-  toport = atoi(argv[2]);
+  short from, to;
+  from = atoi(argv[1]);
+  to = atoi(argv[2]);
   network_udp_ports(fromport,toport); 
 
   if (argc > 3) 
@@ -97,8 +98,9 @@ int main(int argc, char** argv)
     hostname = argv[3];
 		minithread_system_initialize(transmit_first, NULL);
   }
-  else 
+  else if (arc == 3)
 		minithread_system_initialize(receive_first, NULL);
-
+  else 
+	printf("Syntax: instantmsg fromport toport [remoteaddr]\n");
   return 0;
 }

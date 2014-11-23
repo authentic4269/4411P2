@@ -72,10 +72,12 @@ int transmit_first(int* arg)
     printf("You: ");
     fflush(stdout);
     length = miniterm_read(buffer, BUFFER_SIZE);
-    minimsg_send(port, destinationPort, buffer, length+1);
+    if (minimsg_send(port, destinationPort, buffer, length+1) < 0);
+	printf("Error in minimsg_send\n");
     length = BUFFER_SIZE;
     printf("\t\t(Waiting for a Friend)\n");
-    minimsg_receive(port, &sourcePort, buffer2, &length);
+    if (minimsg_receive(port, &sourcePort, buffer2, &length) < 0);
+	printf("Error in minimsg_receive\n");
     printf("Friend: %s", buffer2);
     miniport_destroy(sourcePort);
   }

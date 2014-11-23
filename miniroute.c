@@ -117,8 +117,7 @@ void miniroute_recieve_reply(network_address_t replier, network_interrupt_arg_t 
 }
 
 //Free route data struct
-void delete_route_data(route_data_t routeData)
-{
+void delete_route_data(route_data_t routeData) {
 	free(routeData->route);
 	free(routeData);
 }
@@ -201,8 +200,7 @@ int miniroute_send_pkt(network_address_t dest_address, int hdr_len, char* hdr, i
 				{
 					semaphore_V(route_cache_semaphore);
 					if (USER_DEBUG)	
-						printf("route cache entry timed out");
-					return -1;
+						printf("route cache entry timed out\n");
 				}
 
 				route = (network_address_t*) malloc(sizeof(network_address_t) * routeLength);
@@ -240,10 +238,11 @@ int miniroute_send_pkt(network_address_t dest_address, int hdr_len, char* hdr, i
 				routingHeader = new_miniroute_header(ROUTING_ROUTE_DISCOVERY, dest_address, 
 					currentRequestId, MAX_ROUTE_LENGTH, 1, &myAddr);
 
-				if (routingHeader == NULL)
+				if (routingHeader == NULL) {
 					if (USER_DEBUG)
 						printf("new_miniroute_header failed\n");
 					return -1;
+				}
 
 				fullHeader = merge_headers(routingHeader, hdr, hdr_len);
 

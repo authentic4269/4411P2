@@ -5,7 +5,7 @@
 #include "miniheader.h"
 #include "minithread.h"
 
-#define DEBUG 1
+#define USER_DEBUG 1
 
 int route_request_id;
 int route_requests_index;
@@ -79,7 +79,7 @@ void purge_route_cache(void* arg)
 		ticks = (currentTime - routeData->time_found) * QUANTA / 3;
 		if (ticks > SECOND)
 		{
-			if (DEBUG)	
+			if (USER_DEBUG)	
 				printf("route cache entry timed out");
 			//Delete route data struct
 			delete_route_data(routeData);
@@ -107,7 +107,7 @@ void miniroute_recieve_reply(network_address_t replier, network_interrupt_arg_t 
 	i = hashmap_get(current_discovery_requests, hash_address(replier), &reply_hashmap_item);
 	if (i < 0 || reply_hashmap_item == NULL)
 	{
-		if (DEBUG) printf("error: no listener for REPLY_ packet\n");
+		if (USER_DEBUG) printf("error: no listener for REPLY_ packet\n");
 		return;
 	}
 	route_request = (route_request_t) reply_hashmap_item;
@@ -188,7 +188,7 @@ int miniroute_send_pkt(network_address_t dest_address, int hdr_len, char* hdr, i
 			if (routeData == NULL)
 			{
 				semaphore_V(route_cache_semaphore);
-				if (DEBUG)
+				if (USER_DEBUG)
 					printf("Expected route to be found, none present\n");
 				return -1;
 			}
@@ -200,7 +200,7 @@ int miniroute_send_pkt(network_address_t dest_address, int hdr_len, char* hdr, i
 				if (ticks > SECOND)
 				{
 					semaphore_V(route_cache_semaphore);
-					if (DEBUG)	
+					if (USER_DEBUG)	
 						printf("route cache entry timed out");
 					return -1;
 				}
@@ -241,7 +241,7 @@ int miniroute_send_pkt(network_address_t dest_address, int hdr_len, char* hdr, i
 					currentRequestId, MAX_ROUTE_LENGTH, 1, &myAddr);
 
 				if (routingHeader == NULL)
-					if (DEBUG)
+					if (USER_DEBUG)
 						printf("new_miniroute_header failed\n");
 					return -1;
 
@@ -250,7 +250,7 @@ int miniroute_send_pkt(network_address_t dest_address, int hdr_len, char* hdr, i
 				if (fullHeader == NULL)
 				{
 					free(routingHeader);
-					if (DEBUG)
+					if (USER_DEBUG)
 						printf("merge_headers failed\n");
 					return -1;
 				}
@@ -372,7 +372,7 @@ network_address_t* miniroute_cache(char *newroute, int l1, network_address_t sen
 	route_data_t new_cache_entry = malloc(sizeof(struct route_data));
 	if (ret == NULL || new_cache_entry == NULL)
 	{
-		if (DEBUG)
+		if (USER_DEBUG)
 			printf("malloc error in add_route\n");
 		return NULL;
 	}

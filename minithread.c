@@ -21,6 +21,7 @@
 #include "synch.h"
 #include <assert.h>
 #include "alarm.h"
+#define USER_DEBUG 1
 
 /*
  * A minithread should be defined either in this file or in a private
@@ -440,7 +441,7 @@ void network_handler(network_interrupt_arg_t *arg) {
 			unpack_address(header->path[0], cur);
 			if (network_compare_network_addresses(my_addr, cur) == 0)
 			{
-				if (DEBUG) {
+				if (USER_DEBUG) {
 					printf("error: got own data packet! dropping it\n");
 				}	
 				return;
@@ -464,7 +465,7 @@ void network_handler(network_interrupt_arg_t *arg) {
 					return;
 				}
 				pack_unsigned_int(header->ttl, --i);
-				if (DEBUG) 
+				if (USER_DEBUG) 
 					printf("forwarding data packet\n");
 				network_send_pkt(cur, sizeof(struct routing_header), (char *) header, arg->size-sizeof(struct routing_header), arg->buffer+ sizeof(struct routing_header));
 			}
@@ -487,7 +488,7 @@ void network_handler(network_interrupt_arg_t *arg) {
 			pack_unsigned_int(header->path_len, (1 + pathLen)); 
 			pack_unsigned_int(header->ttl, MAX_ROUTE_LENGTH);
 			header->routing_packet_type = ROUTING_ROUTE_REPLY;
-			if (DEBUG) printf("Discovered by remote host!\n");
+			if (USER_DEBUG) printf("Discovered by remote host!\n");
 			network_send_pkt(arg->sender, sizeof(struct routing_header), (char *) header, arg->size - sizeof(struct routing_header), 
 				(char *) arg->buffer + sizeof(struct routing_header)); 
 		}
@@ -500,7 +501,7 @@ void network_handler(network_interrupt_arg_t *arg) {
 		{
 			if (pathLen++ >= MAX_ROUTE_LENGTH)
 			{
-				if (DEBUG) 
+				if (USER_DEBUG) 
 					printf("path length at maximum, dropping discovery packet\n");	
 				return;
 			}
@@ -509,12 +510,12 @@ void network_handler(network_interrupt_arg_t *arg) {
 			i = unpack_unsigned_int(header->ttl) - 1;
 			if (i == 0)
 			{
-				if (DEBUG)
+				if (USER_DEBUG)
 					printf("ttl 0, dropping packet\n");
 				return;
 			}
 			
-			if (DEBUG) printf("rebroadcasting discovery packet\n");
+			if (USER_DEBUG) printf("rebroadcasting discovery packet\n");
 			pack_unsigned_int(header->ttl, i);
 			network_bcast_pkt(sizeof(struct routing_header), (char *) header, arg->size-sizeof(struct routing_header), arg->buffer+ sizeof(struct routing_header));
 			
@@ -537,7 +538,7 @@ void network_handler(network_interrupt_arg_t *arg) {
 			i--;
 			if (i == 0)
 			{
-				if (DEBUG)
+				if (USER_DEBUG)
 					printf("ttl 0, dropping packet\n");
 				return;
 			}
@@ -556,12 +557,12 @@ void network_handler(network_interrupt_arg_t *arg) {
 			} 			
 			if (success)
 			{
-				if (DEBUG) printf("forwarding reply packet\n");
+				if (USER_DEBUG) printf("forwarding reply packet\n");
 				network_send_pkt(cur, sizeof(struct routing_header), (char *) header, arg->size-sizeof(struct routing_header), arg->buffer+ sizeof(struct routing_header));
 			}
 			else
 			{
-				if (DEBUG) printf("failed to forward reply packet\n");
+				if (USER_DEBUG) printf("failed to forward reply packet\n");
 				return;
 			}
 		

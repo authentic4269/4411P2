@@ -481,6 +481,7 @@ void network_handler(network_interrupt_arg_t *arg) {
 		if (network_compare_network_addresses(my_addr, dst) != 0) 
 		{
 			memcpy(header->destination, header->path[0], 8);
+			pack_address(header->path[pathLen++], my_addr);
 			reversed_path = reverse_path(header->path, pathLen);
 			// This is a little hacky, miniroute_cache unpacks the path anyway so its convenient to not write unpack_path as a separate method
 			unpacked_path = miniroute_cache(reversed_path, MAX_ROUTE_LENGTH, src);

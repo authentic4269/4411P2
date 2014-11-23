@@ -31,7 +31,7 @@ int receive_first(int* arg)
   char buf[BUFFER_SIZE];
   char buf2[BUFFER_SIZE];
 
-  port = miniport_create_unbound(1);
+  port = miniport_create_unbound(0);
 
   while(1)
   {
@@ -65,7 +65,7 @@ int transmit_first(int* arg)
     "Could not resolve hostname, exiting.");
 
   port = miniport_create_unbound(0);
-  dstPort = miniport_create_bound(addr, 1);
+  dstPort = miniport_create_bound(addr, 0);
 
   while(1)
   {

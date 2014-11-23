@@ -360,7 +360,7 @@ route_request_t new_route_request()
 void alarm_wakeup_semaphore(void* arg)
 {
 	semaphore_t semaphore = (semaphore_t) arg;
-	if (semaphore != NULL)
+//TODO uncomment these before submitting	if (semaphore != NULL)
 //		semaphore_V(semaphore);
 }
 

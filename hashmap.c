@@ -2,8 +2,8 @@
 #include <stdio.h>
 #include "hashmap.h"
 #include "linkedlist.h"
+#include "miniroute.h"
 
-#define INITIAL_SIZE 64
 
 //Return an empty hashmap, or NULL on failure.
 hashmap_t hashmap_new() 
@@ -13,13 +13,13 @@ hashmap_t hashmap_new()
 	if(hashmap == NULL) 
 		return NULL;
 
-	hashmap->data = (linkedList_t *) malloc(INITIAL_SIZE * sizeof(linkedList_t));
+	hashmap->data = (linkedList_t *) malloc(SIZE_OF_ROUTE_CACHE * sizeof(linkedList_t));
 	if(hashmap->data == NULL)
 		return NULL;
-	for (i = 0; i < INITIAL_SIZE; i++)
+	for (i = 0; i < SIZE_OF_ROUTE_CACHE; i++)
 		hashmap->data[i] = linkedList_new();
 
-	hashmap->table_size = INITIAL_SIZE;
+	hashmap->table_size = SIZE_OF_ROUTE_CACHE;
 	hashmap->size = 0;
 
 	return hashmap;

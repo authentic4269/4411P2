@@ -1,5 +1,5 @@
 #include "miniroute.h"
-#include "hashmap2.h"
+#include "hashmap.h"
 #include "interrupts.h"
 #include "alarm.h"
 #include "miniheader.h"
@@ -36,11 +36,11 @@ void miniroute_initialize()
 	route_request_id = 0;
 	route_requests_index = 0;
 
-	route_cache = hashmap_new(SIZE_OF_ROUTE_CACHE, 0);
+	route_cache = hashmap_new();
 
-	discovery_packets_seen = hashmap_new(10, 1);
+	discovery_packets_seen = hashmap_new();
 
-	current_discovery_requests = hashmap_new(10, 1);
+	current_discovery_requests = hashmap_new();
 
 
 	route_cache_semaphore = semaphore_create();

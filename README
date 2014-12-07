@@ -1,9 +1,3 @@
-mjv58, say25
-
-Our routing is correct, but due to some issue with our miniport implementation the messaging application is broken. 
-
-
-
 PortOS Educational Operating System
 ===================================
 

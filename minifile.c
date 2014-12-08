@@ -8,16 +8,21 @@
  *     the opened file like the position of the cursor, etc.
  */
 
- #define TABLE_SIZE 11
+ #define NUM_DIRECT_BLOCKS 11
+ #define SEGMENTSIZE = 128 
+ #define NUMSEGMENTS = DISKSIZE / (DISK_BLOCK_SIZE * SEGMENTSIZE)
 
 char* current_directory;
 superblock_t sBlock;
+int NUMSEGMENTS;
+int DISKSIZE;
 
 typedef enum {FILE,DIRECTORY,ND} inodetype;
 
 struct block
 {
 	int blocknum;
+	char[DISK_BLOCK_SIZE];
 };
 
 struct inode
@@ -30,7 +35,8 @@ struct inode
 	int blockNumber;
 	int position;
 
-	int isDirectory;
+	inodetype type;
+	char name[256];
 
 	block_t directblock[TABLE_SIZE];
 	block_t indirectblock;
@@ -38,23 +44,9 @@ struct inode
 
 struct superblock 
 {
-	union 
-	{
-		struct
-		{
-			int number;
-			int diskSize;
+			int magicNumber;
 			inode_t root_inode;
 
-			queue_t inodeQueueFree;
-			queue_t	inodeQueueUsed;
-			queue_t	blockQueueFree;
-			queue_t blockQueueUsed;
-
-		} data;
-
-		char padding[DISK_BLOCK_SIZE];
-	}
 }
 
 struct minifile {
@@ -129,7 +121,7 @@ superblock_t minifile_initialize(superblock_t sBlock)
 
 	//Create superblock
 	sBlock = (superblock_t) malloc(sizeof(struct superblock));
-	sBlock->data.diskSize = diskSize;
+	sBlock->data.disk_size = disk_size;
 	sBlock->data.number = 19540119;
 	
 	//Initialize inodes & blocks
@@ -143,7 +135,7 @@ superblock_t minifile_initialize(superblock_t sBlock)
 	queue_append(sBlock->data.inodeQueueUsed,(any_t)root_inode);
 	queue_append(sBlock->data.inodeQueueFree,(any_t)first_inode);
 
-	for(i = 2; i < (0.1 * diskSize); i++)
+	for(i = 2; i < (0.1 * disk_size); i++)
 	{
 		queue_append(sBlock->data.inodeQueueFree, (any_t) create_inode(i));
 	}
@@ -151,7 +143,7 @@ superblock_t minifile_initialize(superblock_t sBlock)
 	first_block = (block_t) malloc(sizeof(struct block));
 	queue_append(sBlock->data.blockQueueFree, (any_t) first_block);
 
-	for(i = 1; i < (0.9 * diskSize - 1); i++)
+	for(i = 1; i < (0.9 * disk_size - 1); i++)
 	{
 		queue_append(sBlock->data.blockQueueFree, (any_t) create_block(i));
 	}

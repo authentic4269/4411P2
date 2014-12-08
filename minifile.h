@@ -2,7 +2,7 @@
 #define __MINIFILE_H__
 
 #include "defs.h"
-
+#define MAGIC_NUMBER 9805
 /*
  * Definitions for minifiles.
  *
@@ -16,6 +16,44 @@ typedef struct minifile* minifile_t;
 typedef struct block* block_t;
 typedef struct inode* inode_t;
 typedef struct superblock* superblock_t;
+
+
+typedef enum {FILE,DIRECTORY,ND} inodetype;
+
+struct block
+{
+	int blocknum
+	char data[DISK_BLOCK_SIZE];
+};
+
+struct inode
+{
+	int id;
+	// size, in blocks, of the file
+	int size;
+	int references;
+	short free;
+			
+	int blockNumber;
+
+	inodetype type;
+	char name[256];
+
+	int directblocks[TABLE_SIZE];
+	int indirectblock;
+};
+
+struct superblock 
+{
+	int magicNumber;
+	unsigned int num_inodes;
+	unsigned int free_blocks;			
+	unsigned int fs_size;
+
+}; 
+
+
+
 
 extern char* current_directory;
 extern superblock_t sblock;

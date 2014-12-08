@@ -29,6 +29,7 @@ extern sortedlist_t alarms;
  */
 extern int currentTime;
 
+
 /*
  * This is the length, in nanoseconds, of quanta
  */

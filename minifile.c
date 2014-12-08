@@ -17,38 +17,6 @@ superblock_t sBlock;
 int NUMSEGMENTS;
 int DISKSIZE;
 
-typedef enum {FILE,DIRECTORY,ND} inodetype;
-
-struct block
-{
-	int blocknum;
-	char[DISK_BLOCK_SIZE];
-};
-
-struct inode
-{
-	int id;
-	// size, in blocks, of the file
-	int size;
-	int open;
-			
-	int blockNumber;
-	int position;
-
-	inodetype type;
-	char name[256];
-
-	block_t directblock[TABLE_SIZE];
-	block_t indirectblock;
-};
-
-struct superblock 
-{
-			int magicNumber;
-			inode_t root_inode;
-
-}
-
 struct minifile {
   inode_t inode;
 };

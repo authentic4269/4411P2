@@ -17,9 +17,6 @@ superblock_t sBlock;
 int NUMSEGMENTS;
 int DISKSIZE;
 
-struct minifile {
-  inode_t inode;
-};
 
 //Inode Functions
 
@@ -72,7 +69,7 @@ inode_t activate_free_inode(superblock_t sblock)
 block_t create_block(int id)
 {
 	block_t newBlock = (block_t) malloc(DISK_BLOCK_SIZE);
-	newBlock->id = id;
+	newBlock->blocknum = blocknum;
 
 	return newBlock;
 }

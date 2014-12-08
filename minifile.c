@@ -44,10 +44,9 @@ struct inode
 
 struct superblock 
 {
-			int magicNumber;
-			inode_t root_inode;
-
-}
+	int magicNumber;
+	inode_t root_inode;
+};
 
 struct minifile {
   inode_t inode;
@@ -104,7 +103,7 @@ inode_t activate_free_inode(superblock_t sblock)
 block_t create_block(int id)
 {
 	block_t newBlock = (block_t) malloc(DISK_BLOCK_SIZE);
-	newBlock->id = id;
+	newBlock->blocknum = blocknum;
 
 	return newBlock;
 }

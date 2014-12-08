@@ -96,14 +96,10 @@ int minifile_read(minifile_t file, char *data, int maxlen){
 
 }
 
-int minifile_write(minifile_t file, char *data, int len){
 minifile_t minifile_open(char *filename, char *mode){
 	return NULL;
 }
 
-}
-
-int minifile_close(minifile_t file){
 int minifile_write(minifile_t file, char *data, int len){
 	return -1;
 }

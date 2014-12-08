@@ -10,7 +10,7 @@ default: all
 #    necessary PortOS code.
 #
 # this would be a good place to add your tests
-all: instantmsg
+all: instantmsg mkfs
 
 # running "make clean" will remove all files ignored by git.  To ignore more
 # files, you should add them to the file .gitignore
@@ -37,7 +37,9 @@ OBJ =                              \
     queue.o                        \
     synch.o                        \
     read.o                         \
+    disk.o			   \
     miniheader.o                   \
+    minifile.o			   \
     minimsg.o                      \
     minisocket.o                   \
     miniroute.o                    \

@@ -2,6 +2,8 @@
 #define __MINIFILE_H__
 
 #include "defs.h"
+#include "disk.h"
+#define TABLE_SIZE 12
 #define MAGIC_NUMBER 9805
 /*
  * Definitions for minifiles.
@@ -18,11 +20,10 @@ typedef struct inode* inode_t;
 typedef struct superblock* superblock_t;
 
 
-typedef enum {FILE,DIRECTORY,ND} inodetype;
+typedef enum {REGULARFILE,DIRECTORY,ND} inodetype;
 
 struct block
 {
-	int blocknum
 	char data[DISK_BLOCK_SIZE];
 };
 
@@ -47,7 +48,13 @@ struct superblock
 {
 	int magicNumber;
 	unsigned int num_inodes;
+	// block number of the start of the free block bitmap
 	unsigned int free_blocks;			
+	// number of blocks in the free block bitmap
+	unsigned int num_free_blocks;
+	// number of data blocks
+	unsigned int num_data_blocks;
+	unsigned int data_block_start;
 	unsigned int fs_size;
 
 }; 

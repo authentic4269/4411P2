@@ -13,6 +13,12 @@
  */
 
 typedef struct minifile* minifile_t;
+typedef struct block* block_t;
+typedef struct inode* inode_t;
+typedef struct superblock* superblock_t;
+
+extern char* current_directory;
+extern superblock_t sblock;
 
 /* 
  * General requiremens:

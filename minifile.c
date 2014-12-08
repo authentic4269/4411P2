@@ -8,7 +8,7 @@
  *     the opened file like the position of the cursor, etc.
  */
 
- #define TABLE_SIZE 15
+ #define TABLE_SIZE 11
 
 char* current_directory;
 superblock_t sBlock;
@@ -17,46 +17,23 @@ typedef enum {FILE,DIRECTORY,ND} inodetype;
 
 struct block
 {
-	int id;
-	union 
-	{
-		struct 
-		{
-			char directory_entries[TABLE_SIZE][256];
-			inode_t inode_pointers[TABLE_SIZE];
-		} directory;
-
-		struct 
-		{
-			block_t direct_pointers[(DISK_BLOCK_SIZE/4) -1];
-			block_t indirect_pointer;
-		} indirect_block;
-
-		char file_data[DISK_BLOCK_SIZE - sizeof(int)];
-	};
+	int blocknum;
 };
 
 struct inode
 {
 	int id;
-	union
-	{
-		struct
-		{
-			int size;
-			int open;
+	// size, in blocks, of the file
+	int size;
+	int open;
 			
-			int blockNumber;
-			int cursor;
+	int blockNumber;
+	int position;
 
-			inodetype type;
+	int isDirectory;
 
-			block_t direct_pointers[TABLE_SIZE];
-			block_t indirect_pointer;
-		} data;
-
-		char padding[DISK_BLOCK_SIZE - sizeof(int)];
-	}
+	block_t directblock[TABLE_SIZE];
+	block_t indirectblock;
 };
 
 struct superblock 

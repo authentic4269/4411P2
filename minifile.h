@@ -75,6 +75,8 @@ extern superblock_t sblock;
  *     All functions should return NULL or -1 to signal an error.
  */
 
+void minifile_initialize();
+
 /* 
  * Create a file. If the file exists its contents are truncated.
  * If the file doesn't exist it is created in the current directory.

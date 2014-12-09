@@ -6,7 +6,6 @@
 #include "disk.h"
 #include "synch.h"
 
-semaphore_t done_semaphore;
 
 void disk_handler(void *arg)
 {
@@ -25,8 +24,6 @@ int main(int argc, char *argv[]) {
 	inode_t newinode;
 	char *buf;
 	int bitmapsz;
-	done_semaphore = semaphore_create();
-	semaphore_initialize(done_semaphore, 0);
 	if (argc < 2) {
 		printf("Usage: mkfs <disksize>");
 		return 0;
@@ -41,7 +38,7 @@ int main(int argc, char *argv[]) {
 	for (i = 1; i < (disk_size / 100) + 1; i++)
 	{
 		newinode = (inode_t) buf;
-		newinode->id = i;
+		newinode->id = (i - 1);
 		disk_write_block(&newdisk, i, buf);
 	}
 	printf("initializing fs named %s with %d inodes...\n", disk_name, (disk_size / 100));

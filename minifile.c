@@ -31,7 +31,7 @@ void minifile_initialize()
 		printf("Error initializing disk. Maybe you forgot to run mkfs first?\n");
 		exit(0);
 	}
-
+	install_disk_handler(&setup_superblock);
 	
 	
 }

@@ -7,6 +7,7 @@
  *      NAMING AND TYPING OF THESE PROCEDURES.
  *
  */
+#include "minifile.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include "interrupts.h"
@@ -623,6 +624,7 @@ minithread_system_initialize(proc_t mainproc, arg_t mainarg) {
 	minisocket_initialize();
 	minimsg_initialize();
 	miniroute_initialize();
+	minifile_initialize();
 	network_initialize(network_handler);
 	minithread_switch(idleThread->stack_top, mainThread->stack_top);	
 }

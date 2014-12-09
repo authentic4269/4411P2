@@ -52,6 +52,8 @@ typedef struct minithread *minithread_t;
  */ 
 extern minithread_t minithread_fork(proc_t proc, arg_t arg);
 
+extern minithread_t runningThread;
+
 
 /*
  * minithread_t

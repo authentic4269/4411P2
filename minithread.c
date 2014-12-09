@@ -41,7 +41,7 @@ int quantaRemaining;
 int quantaAssignments[4] = {1, 2, 4, 8};
 
 //Keeps track of the RUNNING Thread
-static minithread_t runningThread;
+minithread_t runningThread;
 
 //Used to set Thread ID
 int threadId = 0;
@@ -64,6 +64,7 @@ struct minithread {
 	int status;
 	int id;
 	int level;
+	int currentDirectoryInode;
 	stack_pointer_t *stack_base;
 	stack_pointer_t *stack_top;
 };
@@ -174,6 +175,7 @@ minithread_create(proc_t proc, arg_t arg) {
 	newMinithread->id = threadId++;
 	newMinithread->stack_base = stack_base;
 	newMinithread->stack_top = stack_top;
+	newMinithread->currentDirectoryInode = 0;
 
 	minithread_initialize_stack(stack_top, proc, arg, (proc_t) minithread_exit, (arg_t) newMinithread);
 

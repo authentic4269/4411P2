@@ -1,45 +1,49 @@
 #include "minifile.h"
+#include "minithread.h"
 #include<stdlib.h>
 #include<stdio.h>
 #include<fcntl.h>
 #include<sys/stat.h>
 #include "disk.h"
 #include "synch.h"
+#include "unistd.h"
 
+
+semaphore_t serial_mutex;
 
 void disk_handler(void *arg)
 {
 	disk_interrupt_arg_t *intr = (disk_interrupt_arg_t *) arg;	
+	printf("hello from disk handler\n");
 	if (intr->reply != DISK_REPLY_OK) {
 		printf("Disk error in mkfs, exiting\n");
 		exit(0);
 	}
+	semaphore_V(serial_mutex);
 }
 
-int main(int argc, char *argv[]) {
-	char *endptr;
+int mkfs(int *arg) {
 	int i, j;
 	superblock_t super;
 	disk_t newdisk;
 	inode_t newinode;
 	char *buf;
 	int bitmapsz;
-	if (argc < 2) {
-		printf("Usage: mkfs <disksize>");
-		return 0;
-	}
-	disk_size = strtol(argv[1], &endptr, 10);
+	disk_size = *arg;
 	use_existing_disk = 0;
-	disk_name = "minidisk.disk";
+	disk_name = "MINIFILESYSTEM";
 	disk_flags = DISK_READWRITE;
+	serial_mutex = semaphore_create();
+	semaphore_initialize(serial_mutex, 0);
 	disk_initialize(&newdisk);
-	install_disk_handler(&disk_handler);
+	install_disk_handler(disk_handler);
 	buf = calloc(DISK_BLOCK_SIZE, 1);
 	for (i = 1; i < (disk_size / 100) + 1; i++)
 	{
 		newinode = (inode_t) buf;
 		newinode->id = (i - 1);
 		disk_write_block(&newdisk, i, buf);
+		semaphore_P(serial_mutex);	
 	}
 	printf("initializing fs named %s with %d inodes...\n", disk_name, (disk_size / 100));
 	bitmapsz = ((disk_size - 1 - (disk_size / 100)) / DISK_BLOCK_SIZE) + 1; // the plus 1 accounts for floating part truncation
@@ -53,6 +57,7 @@ int main(int argc, char *argv[]) {
 	for (i = 0; i < bitmapsz; i++)
 	{
 		disk_write_block(&newdisk, i + j, buf);	
+		semaphore_P(serial_mutex);
 	}
 	printf("initializng free block bitmap, in %d blocks\n", bitmapsz);
 	buf = calloc(DISK_BLOCK_SIZE, 1);
@@ -66,6 +71,23 @@ int main(int argc, char *argv[]) {
 	super->fs_size = disk_size;
 	printf("initializing superblock\n");
 	disk_write_block(&newdisk, 0, (char *) buf);
-	
-	return 0;	
+	semaphore_P(serial_mutex);
+	printf("shutting down disk\n");
+	disk_shutdown(&newdisk);	
+	exit(0);
+}
+
+int main(int argc, char *argv[]) {
+	int sz;
+	char *endptr;
+	if (argc < 2) {
+		printf("Usage: mkfs <disksize>");
+		return 0;
+	}
+	if (access("MINIFILESYSTEM", W_OK) > -1) {
+		remove("MINIFILESYSTEM");
+	}
+	sz = strtol(argv[1], &endptr, 10);
+	minithread_system_initialize(mkfs, &sz);	
+	return -1;	
 }

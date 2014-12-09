@@ -24,6 +24,7 @@ void disk_handler(void *arg)
 
 int mkfs(int *arg) {
 	int i, j;
+	int blockposition = 0;
 	superblock_t super;
 	disk_t newdisk;
 	inode_t newinode;
@@ -38,9 +39,26 @@ int mkfs(int *arg) {
 	disk_initialize(&newdisk);
 	install_disk_handler(disk_handler);
 	buf = calloc(DISK_BLOCK_SIZE, 1);
-	for (i = 1; i < (disk_size / 100) + 1; i++)
+	
+	// initialize the root node separately, allocating its data blocks
+	newinode = (inode_t) buf;
+	newinode->id = 0;
+	newinode->references = 1;
+	newinode->free = 0;	
+	newinode->type = DIRECTORY;
+	strcpy(newinode->name, "/\0");
+	for (i = 0; i < TABLE_SIZE; i++)
+	{
+		newinode->directblocks[i] = i;
+	}
+	disk_write_block(&newdisk, 1, buf);
+	semaphore_P(serial_mutex);	
+	free(buf);
+	buf = calloc(DISK_BLOCK_SIZE, 1);
+	for (i = 2; i < (disk_size / 100) + 1; i++)
 	{
 		newinode = (inode_t) buf;
+		newinode->free = 1;
 		newinode->id = (i - 1);
 		disk_write_block(&newdisk, i, buf);
 		semaphore_P(serial_mutex);	
@@ -49,12 +67,35 @@ int mkfs(int *arg) {
 	bitmapsz = ((disk_size - 1 - (disk_size / 100)) / DISK_BLOCK_SIZE) + 1; // the plus 1 accounts for floating part truncation
 	j = i;
 	buf = malloc(DISK_BLOCK_SIZE);
-	for (i = 0; i < DISK_BLOCK_SIZE; i++)
+
+	for (i = 0; i < TABLE_SIZE; i++) 
 	{
-		// need a 1 for every block, because initially every block is free
+		// need a 0 in the first TABLE_SIZE blocks, because these are allocated to the root node
+		buf[i / 8] = 0xFF;
+	}
+	for (i = 0; i < TABLE_SIZE; i++)
+	{
+		// this logic might be a little confusing. it puts a 0 in the first TABLE_SIZE bits of buf. 
+		if (i && i % 8 == 0) {
+			blockposition = 8 / i;
+		}
+		// 0xfe << (i % 8) has a zero in the i %8'th position
+		buf[blockposition] &= (0xfe << (i % 8));
+	}
+	for (i = blockposition + 1; i < DISK_BLOCK_SIZE; i++)
+	{
+		// need a 1 for every other block, because initially they're all free
 		buf[i] = 0xFF;
 	}
-	for (i = 0; i < bitmapsz; i++)
+	disk_write_block(&newdisk, j, buf);
+	semaphore_P(serial_mutex);
+
+	for (i = 0; i < DISK_BLOCK_SIZE; i++)
+	{
+		// need a 1 for every other block, because initially they're all free
+		buf[i] = 0xFF;
+	}
+	for (i = 1; i < bitmapsz; i++)
 	{
 		disk_write_block(&newdisk, i + j, buf);	
 		semaphore_P(serial_mutex);

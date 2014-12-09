@@ -35,7 +35,6 @@ struct inode
 	int references;
 	short free;
 			
-	int blockNumber;
 
 	inodetype type;
 	char name[256];

@@ -621,12 +621,12 @@ minithread_system_initialize(proc_t mainproc, arg_t mainarg) {
 
 
 	minithread_clock_init(QUANTA, clock_handler);
+	minifile_initialize();
 	miniterm_initialize();
 	miniroute_initialize();
 	minisocket_initialize();
 	minimsg_initialize();
 	miniroute_initialize();
-	minifile_initialize();
 	network_initialize(network_handler);
 	minithread_switch(idleThread->stack_top, mainThread->stack_top);	
 }

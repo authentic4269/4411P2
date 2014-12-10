@@ -27,6 +27,11 @@ struct block
 	char data[DISK_BLOCK_SIZE];
 };
 
+struct minifile {
+	int inode;
+	int position;
+};
+
 struct inode
 {
 	int id;

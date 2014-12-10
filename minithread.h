@@ -43,6 +43,18 @@ extern int QUANTA;
 
 typedef struct minithread *minithread_t;
 
+struct minithread {
+	proc_t proc;
+	arg_t arg;
+	int status;
+	int id;
+	int level;
+	int currentDirectoryInode;
+	stack_pointer_t *stack_base;
+	stack_pointer_t *stack_top;
+};
+
+
 /*
  * minithread_t
  * minithread_fork(proc_t proc, arg_t arg)

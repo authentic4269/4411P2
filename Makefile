@@ -10,7 +10,7 @@ default: all
 #    necessary PortOS code.
 #
 # this would be a good place to add your tests
-all: instantmsg mkfs network1 sieve test3
+all: instantmsg mkfs network1 sieve test3 linkedlisttest blockcachetest
 
 # running "make clean" will remove all files ignored by git.  To ignore more
 # files, you should add them to the file .gitignore
@@ -45,6 +45,7 @@ OBJ =                              \
     miniroute.o                    \
     multilevel_queue.o             \
     linkedlist.o		   \
+    blockcache.o		   \
     hashmap.o			   \
     network.o
 

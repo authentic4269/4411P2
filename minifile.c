@@ -1,4 +1,5 @@
 #include "minifile.h"
+#include "blockcache.h"
 #include "disk.h"
 #include "queue.h"
 #include "synch.h"
@@ -30,6 +31,11 @@ semaphore_t setup_superblock_mutex;
 semaphore_t setup_inode_mutex;
 semaphore_t setup_bitmap_mutex;
 semaphore_t done_mutex;
+blockcache_t blockcache;
+
+semaphore_t *block_mutexes;
+
+void handle_disk_response(void *arg); // forward declaration
 
 void setup_inode(void *diskarg)
 {
@@ -99,6 +105,13 @@ void setup_superblock(void *diskarg)
 		printf("Failed to allocate memory for inode table, exiting\n");
 		exit(0);
 	}
+
+	block_mutexes = (semaphore_t *) malloc(sizeof(semaphore_t) * sBlock->num_data_blocks);
+	for (i = 0; i < sBlock->num_data_blocks; i++)
+	{
+		block_mutexes[i] = semaphore_create();
+		semaphore_initialize(block_mutexes[i], 0); 
+	}
 	printf("initializing inodes\n");
 	install_disk_handler(setup_inode);
 	outstanding_requests = sBlock->num_inodes;
@@ -125,13 +138,23 @@ void setup_superblock(void *diskarg)
 		disk_read_block(&disk, 1 + sBlock->num_inodes + i, free_block_bitmap + (DISK_BLOCK_SIZE * i));
 	}
 	semaphore_P(done_mutex);
+	install_disk_handler(handle_disk_response);
 	free(buf);
+}
+
+void handle_disk_response(void *arg) {
+	disk_interrupt_arg_t arg = *((disk_interrupt_arg_t *) diskarg);
+	if (arg->type == DISK_READ)
+	{
+		semaphore_V(block_mutexes[arg->request->blocknum - sBlock->data_block_start]);
+	}
 }
 
 void minifile_initialize()
 {
 	char *buf;
 	buf = malloc(DISK_BLOCK_SIZE);
+	blockcache = blockcache_new();
 	if (access("MINIFILESYSTEM", W_OK) < 0)
 	{
 		printf("No disk file found. If you're running mkfs, ignore this message. If you're not, please run mkfs first to create a disk before you run this program.\n");
@@ -162,11 +185,56 @@ minifile_t minifile_open(char *filename, char *mode){
 
 int minifile_read(minifile_t file, char *data, int maxlen)
 {
-	return -1;
+	int curblock;
+	int blockoffset;
+	int amountToRead;
+	char *blockptr;
+	int amountLeft;
+	inode_t inode = inodes[file->inode];	
+	curblock = file->position / DISK_BLOCK_SIZE;
+	blockoffset = file->position % DISK_BLOCK_SIZE;
+	if (maxlen > file->size - file->position) 
+	{
+		amountToRead = file->size - file->position;
+	}
+	else
+	{
+		amountToRead = maxlen;
+	}
+	amountLeft = amountToRead;
+	while (amountLeft > 0) {
+		get_block(inode[curblock], &blockptr);		
+		curblock++;
+		if (amountLeft > DISK_BLOCK_SIZE) {
+			memcpy(data, blockptr, DISK_BLOCK_SIZE);
+			amountLeft -= DISK_BLOCK_SIZE;
+		}
+		else {
+			memcpy(data, blockptr, amountLeft);
+			break;
+		}
+	}
+	return amountToRead;
+}
+
+void get_data_block(int blockid, char **ret) 
+{
+	if (blockcache_get(blockcache, blockid, (void **) ret) >= 0)
+	{
+		return;
+	}	
+	else
+	{
+		ret = &((char *) malloc(DISK_BLOCK_SIZE));
+		disk_read_block(&disk, blockid + sBlock->data_block_start, *ret);
+		semaphore_P(block_mutexes[blockid]);
+	}
 }
 
 int minifile_write(minifile_t file, char *data, int len){
-	return -1;
+	inode_t inode = inodes[file->inode];	
+	curblock = file->position / DISK_BLOCK_SIZE;
+	blockoffset = file->position % DISK_BLOCK_SIZE;
 }
 
 int minifile_close(minifile_t file){

@@ -53,14 +53,14 @@ main(int argc, char *argv[]) {
 	if (linkedList_delete(testlist, e) != 0)
 		printf("Delete test failed\n");
 
-	if (linkedList_get(testlist, e, ptr) != 0)
+	if (linkedList_get(testlist, e, ptr) > 0)
 		printf("Get test failed\n");
 
 	//Dequeue c = 2
 	linkedList_get(testlist, f, ptr);
 	iptr = (int **) ptr;
 	if (**iptr != 2)
-		printf("Delete test failed. Expected to dequeue 1, dequeued %d\n", **iptr);
+		printf("Delete test failed. Expected to dequeue 2, dequeued %d\n", **iptr);
 
 	//Check that length = 0
 	if (linkedList_length(testlist) != 2)

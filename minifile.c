@@ -30,6 +30,8 @@ int outstanding_requests;
 semaphore_t setup_superblock_mutex;
 semaphore_t setup_inode_mutex;
 semaphore_t setup_bitmap_mutex;
+semaphore_t allocate_inode_mutex;
+semaphore_t allocate_block_mutex;
 semaphore_t done_mutex;
 blockcache_t blockcache;
 
@@ -142,31 +144,50 @@ void setup_superblock(void *diskarg)
 	free(buf);
 }
 
+inode_t allocate_inode() {
+	int i;
+	semaphore_P(allocate_inode_mutex);
+	for (i = 1; i < sBlock->num_inodes; i++)
+	{
+		if (inodes[i]->free == 1)
+		{
+			inodes[i]->directblocks[0] = allocate_block();
+			inodes[i]->references = 1;
+			inodes[i]->size = 1;
+			inodes[i]->bytesWritten = 0;
+			inodes[i]->free = 0;
+		}
+	}
+	semaphore_V(allocate_inode_mutex);
+}
+
 // find a free block, and mark it as not free in the bitmap. 1 is free.
 int allocate_block() {
 	int i, j;
-	unsigned char orbyte;
+	unsigned char andbyte;
+	semaphore_P(allocate_block_mutex);
 	for (i = 0; i < (DISK_BLOCK_SIZE * sBlock->num_free_blocks); i++)
 	{
 		j = 0;
-		orbyte = 0x01;
+		andbyte = 0x01;
 		while (j < 8) {
 			if (cmp & free_block_bitmap[i])
 			{
-				free_block_bitmap[i] |= orbyte;
+				free_block_bitmap[i] &= ~(andbyte);
 				return i + j;
 			}
-			cmp  = cmp << 1;
+			andbyte  = andbyte << 1;
 		}
 	}
+	semaphore_V(allocate_block_mutex);
 }
 
 // mark data block blockid as free. 1 is free.
 void free_block(int blockid) {
 	int bitoffset = blockid % 8;
 	int i;
-	unsigned char andbyte = ~(0x01 << bitoffset);
-	free_block_bitmap[blockid / 8] &= andbyte;
+	unsigned char orbyte = (0x01 << bitoffset);
+	free_block_bitmap[blockid / 8] |= orbyte;
 }
 
 void handle_disk_response(void *arg) {
@@ -191,6 +212,10 @@ void minifile_initialize()
 	use_existing_disk = 1;	
 	done_mutex = semaphore_create();	
 	semaphore_initialize(done_mutex, 0);
+	allocate_inode_mutex = semaphore_create();
+	semaphore_initialize(allocate_inode_mutex, 1);
+	allocate_block_mutex = semaphore_create();
+	semaphore_initialize(allocate_block_mutex, 1);
 	printf("Reading block 0 from disk...\n");
 	if (disk_initialize(&disk) < 0) {
 		printf("Error initializing disk. Maybe you forgot to run mkfs first?\n");
@@ -202,7 +227,42 @@ void minifile_initialize()
 
 minifile_t minifile_creat(char *filename)
 {
-	return NULL;
+	inode_t curdir = inodes[runningThread->currentDirectoryInode];
+	int numentries;
+	int i;
+	char *validname = strchr(filename, '/');
+	char *entrybuf = (char *) malloc(sizeof(struct directory_entry));
+	minifile_t ret = (minifile_t) malloc(sizeof(struct minifile));
+	inode_t newinode;
+	directory_entry_t entry;
+	if (validname != NULL)
+	{
+		printf("Invalid file name. Valid file names may not contain the '/' character\n");
+	}
+	if (curdir->type != DIRECTORY)
+	{
+		printf("Warning: current directory type is not set to DIRECTORY\n");
+	}		
+	numentries = curdir->bytesWritten / sizeof(struct directory_entry);	
+	// test if such a file already exists in the current directory
+	for (i = 0; i < numentries; i++)
+	{
+		inode_read(curdir, entrybuf, i * sizeof(struct directory_entry), sizeof(struct directory_entry));
+		entry = (directory_entry_t) entrybuf;
+		if (strcmp(entrybuf->name, filename) == 0)
+		{
+			printf("Error: file already exists in current directory\n");
+			return NULL;
+		}
+	} 
+	newinode = allocate_inode();	
+	entry = (directory_entry_t) entrybuf;
+	entry->name = filename;
+	entry->inode_num = newinode->id;
+	inode_write(curdir, entrybuf, curdir->bytesWritten, sizeof(directory_entry)); 
+	ret->inode = newinode->id;
+	ret->position = 0;
+	return ret;
 }
 
 minifile_t minifile_open(char *filename, char *mode){
@@ -310,23 +370,31 @@ int minifile_write(minifile_t file, char *data, int len){
 	return inode_write(inode, data, file->position, len); 
 }
 
-void inode_remove(inode_t inode)
+void free_inode(inode_t inode)
 {
 	int i;
 	char *buf = (char *) calloc(DISK_BLOCK_SIZE, 1);
 	inode_t overwrite = (inode_t) buf;
+	inode_t inodes_entry
 	for (i = 0; i < inode->size; i++)
 	{
 		//TODO: add support for indirect blocks when inode->size > TABLE_SIZE
 		free_block(inode->directblocks[i]);	
+		inode->directblocks[i] = 0;
+		inode->name = "\0";
 	}	
+	inode->indirectblock = 0;
+	inode->size = 0;
+	inode->bytesWritten = 0;
+	inode->references = 0;
+	inode->free = 1;
 }
 
 int minifile_close(minifile_t file){
 	inode_t inode = inodes[file->inode];
 	inode->references--;
 	if (inode->references == 0) {
-		inode_remove(inode);
+		free_inode(inode);
 	}
 }
 

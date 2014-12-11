@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#define LIMIT 30
+#define LIMIT 50
 
 //Items in the blockcache
 struct blockcacheNode { 

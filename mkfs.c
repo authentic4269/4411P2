@@ -46,6 +46,7 @@ int mkfs(int *arg) {
 	newinode->references = 1;
 	newinode->free = 0;	
 	newinode->type = DIRECTORY;
+	newinode->size = TABLE_SIZE;
 	strcpy(newinode->name, "/\0");
 	for (i = 0; i < TABLE_SIZE; i++)
 	{
@@ -55,10 +56,10 @@ int mkfs(int *arg) {
 	semaphore_P(serial_mutex);	
 	free(buf);
 	buf = calloc(DISK_BLOCK_SIZE, 1);
+	newinode = (inode_t) buf;
+	newinode->free = 1;
 	for (i = 2; i < (disk_size / 100) + 1; i++)
 	{
-		newinode = (inode_t) buf;
-		newinode->free = 1;
 		newinode->id = (i - 1);
 		disk_write_block(&newdisk, i, buf);
 		semaphore_P(serial_mutex);	

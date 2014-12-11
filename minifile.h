@@ -5,6 +5,7 @@
 #include "disk.h"
 #define TABLE_SIZE 12
 #define MAGIC_NUMBER 9805
+#define FILENAMELEN 256
 /*
  * Definitions for minifiles.
  *
@@ -18,6 +19,7 @@ typedef struct minifile* minifile_t;
 typedef struct block* block_t;
 typedef struct inode* inode_t;
 typedef struct superblock* superblock_t;
+typedef struct directory_entry* directory_entry_t;
 
 
 typedef enum {REGULARFILE,DIRECTORY,ND} inodetype;
@@ -37,12 +39,15 @@ struct inode
 	int id;
 	// size, in blocks, of the file
 	int size;
+	// number of bytes stored by the file. differs from size in that size is how much space is allocated, while
+	// byteswritten is number of bytes which have been written. byteswritten < size is an invariant.
+	int bytesWritten;
 	int references;
 	short free;
 			
 
 	inodetype type;
-	char name[256];
+	char name[FILENAMELEN];
 
 	int directblocks[TABLE_SIZE];
 	int indirectblock;
@@ -63,7 +68,11 @@ struct superblock
 
 }; 
 
-
+struct directory_entry
+{
+	char name[FILENAMELEN];
+	unsigned int inode_num;
+};
 
 
 extern char* current_directory;

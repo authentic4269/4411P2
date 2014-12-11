@@ -6,6 +6,7 @@
 #define TABLE_SIZE 12
 #define MAGIC_NUMBER 9805
 #define FILENAMELEN 256
+#define MAX_FS_DEPTH 30
 /*
  * Definitions for minifiles.
  *
@@ -47,7 +48,7 @@ struct inode
 	int bytesWritten;
 	int references;
 	short free;
-			
+	int parent;			
 
 	inodetype type;
 	char name[FILENAMELEN];

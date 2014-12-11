@@ -563,6 +563,7 @@ int minifile_mkdir(char *dirname){
 	} 
 	newinode = allocate_inode();	
 	newinode->type = DIRECTORY;
+	newinode->parent = curdir->id;
 	entry = (directory_entry_t) entrybuf;
 	entry->name = dirname;
 	entry->inode_num = newinode->id;
@@ -637,7 +638,7 @@ inode_t find(char *path, inode_t curdir) {
 	int found;
 			
 	entrybuf = (char *) malloc(sizeof(struct directory_entry));
-	while ((next = strtok(path, "/.")) != NULL)
+	while ((next = strtok(path, "/")) != NULL)
 	{
 		numentries = curdir->bytesWritten / sizeof(struct directory_entry);	
 		// test if such a file already exists in the current directory
@@ -666,13 +667,25 @@ inode_t find(char *path, inode_t curdir) {
 
 int minifile_stat(char *path){
 	inode_t target; 
+	char newpath[FILENAMELEN * 30];
 	if (path[0] == '/')
 	{
-		target = find(path, inodes[0]);	
+		strncpy(newpath, (path + 1), strlen(path)-1);
+		target = find(newpath, inodes[0]);	
 	}
 	else if (path[0] == path[1] == '.') 
 	{
-		printf("Error: system does not support ../ convention for parent directory\n");
+		if (runningThread->currentDirectoryInode == 0)
+		{
+			printf("Can't specify a path relative to parent directory from the root node\n");
+			return -1;
+		}
+		strncpy(newpath, (path + 3), strlen(path)-3);
+		if (strlen(newpath) == 0)
+			target = inodes[inodes[runningThread->currentDirectoryInode]->parent];
+		else
+			target = find(newpath, inodes[inodes[runningThread->currentDirectoryInode]->parent]);
+	
 	}
 	else
 	{
@@ -693,13 +706,24 @@ int minifile_stat(char *path){
 
 int minifile_cd(char *path){
 	inode_t target; 
+	char newpath[FILENAMELEN * MAX_FS_DEPTH];
 	if (path[0] == '/')
 	{
-		target = find(path, inodes[0]);	
+		strncpy(newpath, (path + 1), strlen(path)-1);
+		target = find(newpath, inodes[0]);	
 	}
 	else if (path[0] == path[1] == '.') 
 	{
-		printf("Error: system does not support ../ convention for parent directory\n");
+		if (runningThread->currentDirectoryInode == 0)
+		{
+			printf("Can't specify a path relative to parent directory from the root node\n");
+			return -1;
+		}
+		strncpy(newpath, (path + 3), strlen(path)-3);
+		if (strlen(newpath) == 0)
+			target = inodes[inodes[runningThread->currentDirectoryInode]->parent];
+		else
+			target = find(newpath, inodes[inodes[runningThread->currentDirectoryInode]->parent]);
 	}
 	else
 	{
@@ -724,13 +748,24 @@ char **minifile_ls(char *path){
 	char *entrybuf;
 	directory_entry_t entry;
 	char **ret;
+	char newpath[FILENAMELEN * MAX_FS_DEPTH];
 	if (path[0] == '/')
 	{
-		target = find(path, inodes[0]);	
+		strncpy(newpath, (path + 1), strlen(path)-1);
+		target = find(newpath, inodes[0]);	
 	}
 	else if (path[0] == path[1] == '.') 
 	{
-		printf("Error: system does not support ../ convention for parent directory\n");
+		if (runningThread->currentDirectoryInode == 0)
+		{
+			printf("Can't specify a path relative to parent directory from the root node\n");
+			return -1;
+		}
+		strncpy(newpath, (path + 3), strlen(path)-3);
+		if (strlen(newpath) == 0)
+			target = inodes[inodes[runningThread->currentDirectoryInode]->parent];
+		else
+			target = find(newpath, inodes[inodes[runningThread->currentDirectoryInode]->parent]);
 	}
 	else
 	{
@@ -760,28 +795,22 @@ char **minifile_ls(char *path){
 	return ret;
 }
 
-char *pwd_find(inode_t node, int target, char *path)
-{
-	inode_t target; 
-	int numentries;
-	char *entrybuf;
-	directory_entry_t entry;
-	char **ret;
-// TODO when not so sleepy
-	numentries = target->bytesWritten / sizeof(struct directory_entry);	
-	entrybuf = (char *) malloc(sizeof(struct directory_entry));
-	ret = (char **) malloc(sizeof(char *) * numentries);
-	// test if such a file already exists in the current directory
-	for (i = 0; i < numentries; i++)
-	{
-		inode_read(target, entrybuf, i * sizeof(struct directory_entry), sizeof(struct directory_entry));
-		entry = (directory_entry_t) entrybuf;
-		ret[i] = (char *) malloc(FILENAMELEN);
-		memcpy(ret[i], entry->name, FILENAMELEN);
-	}
-}
-
 char* minifile_pwd(void){
 	char *ret = (char *) malloc(FILENAMELEN * 100);
-	return pwd_find(inodes[0], runningThread->currentDirectoryInode, ret);
+	char **entries = (char **) malloc(sizeof(char *) * MAX_FS_DEPTH);
+	int cur = runningThread->currentDirectoryInode;
+	int i = 0;
+	int j;
+	while (cur != 0)
+	{
+		entries[i] = inodes[cur]->name;
+		i++;
+		cur = inodes[cur]->parent;
+	}
+	for (j = 0; j < i; j++)
+	{
+		strcat(ret, "/");
+		strcat(ret, entries[i-j]);
+	}
+	return ret;
 }

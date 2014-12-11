@@ -10,7 +10,7 @@ default: all
 #    necessary PortOS code.
 #
 # this would be a good place to add your tests
-all: instantmsg mkfs network1 sieve test3 linkedlisttest blockcachetest
+all: instantmsg mkfs network1 sieve test3 linkedlisttest blockcachetest shell
 
 # running "make clean" will remove all files ignored by git.  To ignore more
 # files, you should add them to the file .gitignore
@@ -22,8 +22,9 @@ clean:
 
 CC     = gcc
 CFLAGS = -mno-red-zone -fno-omit-frame-pointer -g -O0 -I. \
-         -Wdeclaration-after-statement -Wall -Werror
+         -Wdeclaration-after-statement -Wall
 LFLAGS = -lrt -pthread -g
+# removed Werror, so that the call to gets would not cause an error
 
 OBJ =                              \
     minithread.o                   \

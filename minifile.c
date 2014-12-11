@@ -238,6 +238,7 @@ minifile_t minifile_creat(char *filename)
 	if (validname != NULL)
 	{
 		printf("Invalid file name. Valid file names may not contain the '/' character\n");
+		return NULL;
 	}
 	if (curdir->type != DIRECTORY)
 	{
@@ -249,24 +250,115 @@ minifile_t minifile_creat(char *filename)
 	{
 		inode_read(curdir, entrybuf, i * sizeof(struct directory_entry), sizeof(struct directory_entry));
 		entry = (directory_entry_t) entrybuf;
-		if (strcmp(entrybuf->name, filename) == 0)
+		if (strcmp(entry->name, filename) == 0)
 		{
 			printf("Error: file already exists in current directory\n");
 			return NULL;
 		}
 	} 
 	newinode = allocate_inode();	
+	newinode->type = REGULARFILE;
 	entry = (directory_entry_t) entrybuf;
 	entry->name = filename;
 	entry->inode_num = newinode->id;
 	inode_write(curdir, entrybuf, curdir->bytesWritten, sizeof(directory_entry)); 
 	ret->inode = newinode->id;
 	ret->position = 0;
+	ret->type = WRITE;
 	return ret;
 }
 
 minifile_t minifile_open(char *filename, char *mode){
-	return NULL;
+
+	inode_t curdir = inodes[runningThread->currentDirectoryInode];
+	int numentries;
+	int i;
+	int foundinode = 0;
+	char *validname = strchr(filename, '/');
+	char *entrybuf;
+	minifile_t ret;
+	inode_t newinode;
+	directory_entry_t entry;
+	if (validname != NULL)
+	{
+		printf("Invalid file name. Valid file names may not contain the '/' character\n");
+		return NULL;
+	}
+	if (mode[0] != 'r' && mode[0] != 'w' && mode[0] != 'a') 
+	{
+		printf("This system supports four modes: r, w, and a. r is for reading only, r+, or update mode, for reading and writing (starting at the beginning), w for truncating and then writing, and a for appending. The request to minifile_open should contain a single character, which must be one of these three\n");
+		return NULL;
+	}
+	if (curdir->type != DIRECTORY)
+	{
+		printf("Warning: current directory type is not set to DIRECTORY\n");
+	}		
+	entrybuf = (char *) malloc(sizeof(struct directory_entry));
+	ret = (minifile_t) malloc(sizeof(struct minifile));
+	
+	numentries = curdir->bytesWritten / sizeof(struct directory_entry);	
+	// test if such a file already exists in the current directory
+	for (i = 0; i < numentries; i++)
+	{
+		inode_read(curdir, entrybuf, i * sizeof(struct directory_entry), sizeof(struct directory_entry));
+		entry = (directory_entry_t) entrybuf;
+		if (strcmp(entry->name, filename) == 0)
+		{
+			foundinode = entrybuf->inode_num;
+		}
+	} 
+
+	if (mode[0] == 'r')
+	{
+		if (foundinode == 0) {
+			printf("File does not exist\n");
+			return NULL;
+		}
+		if (mode[1] == '+')
+		{
+			ret->type = WRITE;
+			ret->inode = foundinode;
+			ret->position = 0;
+			return ret;
+		}
+		else
+		{
+			ret->type = READ;
+			ret->inode = foundinode;
+			ret->position = 0;
+			return ret;
+		}
+	}
+	else if (mode[0] == 'w') 	
+	{
+		if (foundinode != 0) 
+			free_inode(inodes[foundinode]);
+		newinode = allocate_inode();	
+		entry = (directory_entry_t) entrybuf;
+		entry->name = filename;
+		entry->inode_num = newinode->id;
+		inode_write(curdir, entrybuf, curdir->bytesWritten, sizeof(directory_entry)); 
+		ret->inode = newinode->id;
+		ret->position = 0;
+		ret->type = WRITE;
+		return ret;
+	}
+	else if (mode[0] == 'a')
+	{
+		if (foundinode == 0)
+		{
+			newinode = allocate_inode();	
+		}
+		else
+		{
+			// not actually a newinode, heh
+			newinode = inodes[foundinode];
+		}
+		ret->inode = newinode->id;
+		ret->type = APPEND;
+		ret->position = newinode->blocksWritten;
+		return ret;
+	}
 }
 
 
@@ -331,7 +423,6 @@ int inode_write(inode_t inode, char *data, int position, int len)
 {
 	int currentblock = position / DATA_BLOCK_SIZE;
 	int offset = position % DATA_BLOCK_SIZE;
-	int amountToWrite = len;
 	int amountRemaining = len;
 	char *buf;
 	while (amountRemaining > 0) {
@@ -349,24 +440,30 @@ int inode_write(inode_t inode, char *data, int position, int len)
 			// can fit everything into the current block
 			memcpy(buf + offset, data, amountRemaining);
 			amountRemaining = 0; 
-			disk_write_block(&disk, inode->directblocks[currentblock] + sBlock->data_block_start);
+			disk_write_block(&disk, inode->directblocks[currentblock] + sBlock->data_block_start, buf);
 		}
 		else
 		{
 			memcpy(buf + offset, data, DISK_BLOCK_SIZE - offset);
+			disk_write_block(&disk, inode->directblocks[currentblock] + sBlock->data_block_start, buf);
 			data = data + (DISK_BLOCK_SIZE - offset);
 			offset = 0;	
 			currentblock++;
 			amountRemaining -= (DISK_BLOCK_SIZE - offset);
 		}
 	}
-	inode->bytesWritten += amountToWrite;	
-	return amountToWrite;
+	if (position + len > inode->bytesWritten)
+		inode->bytesWritten = position + len;	
+	return len;
 }
 
 
 int minifile_write(minifile_t file, char *data, int len){
 	inode_t inode = inodes[file->inode];
+	if (file->type == READ) {
+		printf("Error: the file descriptor provided to minifile_write is read only\n");
+		return -1;
+	}
 	return inode_write(inode, data, file->position, len); 
 }
 
@@ -399,29 +496,292 @@ int minifile_close(minifile_t file){
 }
 
 int minifile_unlink(char *filename){
+	char *entrybuf = (char *) malloc(sizeof(struct directory_entry));
+	char *overwritebuf = (char *) malloc(sizeof(struct directory_entry));
+	int found = 0;
+	inode_t curdir = inodes[runningThread->currentDirectoryInode];	
+	directory_entry_t entry;
+	directory_entry_t overwrite;
+	numentries = curdir->bytesWritten / sizeof(struct directory_entry);	
+	// test if such a file already exists in the current directory
+	for (i = 0; i < numentries; i++)
+	{
+		inode_read(curdir, entrybuf, i * sizeof(struct directory_entry), sizeof(struct directory_entry));
+		entry = (directory_entry_t) entrybuf;
+		if (strcmp(entry->name, filename) == 0)
+		{
+			found = 1;
+			break;
+		}
+	} 
+	if (found) {
+		if (inodes[entry->inode_num]->type != REGULARFILE)
+		{
+			printf("Error: unlink target is not a regular file\n");
+			return -1;
+		}
+		for (i += 1; i < numentries; i++)
+		{
+			inode_read(curdir, overwritebuf, i * sizeof(struct directory_entry), sizeof(struct directory_entry));
+			inode_write(curdir, overwritebuf, (i-1) * sizeof(struct directory_entry), sizeof(struct directory_entry));
+		}	
+		curdir->bytesWritten -= sizeof(struct directory_entry);
+		return 0;
+	}
+	printf("No such file exists\n");
 	return -1;
 }
 
 int minifile_mkdir(char *dirname){
-	return -1;
+	inode_t curdir = inodes[runningThread->currentDirectoryInode];
+	int numentries;
+	int i;
+	char *validname = strchr(dirname, '/');
+	char *entrybuf = (char *) malloc(sizeof(struct directory_entry));
+	inode_t newinode;
+	directory_entry_t entry;
+	if (validname != NULL)
+	{
+		printf("Invalid file name. Valid file names may not contain the '/' character\n");
+		return NULL;
+	}
+	if (curdir->type != DIRECTORY)
+	{
+		printf("Warning: current directory type is not set to DIRECTORY\n");
+	}		
+	numentries = curdir->bytesWritten / sizeof(struct directory_entry);	
+	// test if such a file already exists in the current directory
+	for (i = 0; i < numentries; i++)
+	{
+		inode_read(curdir, entrybuf, i * sizeof(struct directory_entry), sizeof(struct directory_entry));
+		entry = (directory_entry_t) entrybuf;
+		if (strcmp(entry->name, filename) == 0)
+		{
+			printf("Error: file or directory already exists with that name in current directory\n");
+			return NULL;
+		}
+	} 
+	newinode = allocate_inode();	
+	newinode->type = DIRECTORY;
+	entry = (directory_entry_t) entrybuf;
+	entry->name = dirname;
+	entry->inode_num = newinode->id;
+	inode_write(curdir, entrybuf, curdir->bytesWritten, sizeof(directory_entry)); 
+	ret->inode = newinode->id;
+	ret->position = 0;
+	ret->type = WRITE;
+	return 0;
 }
 
 int minifile_rmdir(char *dirname){
-	return -1;
+	inode_t curdir = inodes[runningThread->currentDirectoryInode];
+	int numentriesCurdir;
+	int numentriesTarget;
+	int found = 0;
+	int i;
+	char *validname = strchr(dirname, '/');
+	char *entrybuf = (char *) malloc(sizeof(struct directory_entry));
+	char *overwritebuf = (char *) malloc(sizeof(struct directory_entry));
+	inode_t rmdir;
+	directory_entry_t entry;
+	if (validname != NULL)
+	{
+		printf("Invalid file name. Valid file names may not contain the '/' character\n");
+		return NULL;
+	}
+	if (curdir->type != DIRECTORY)
+	{
+		printf("Warning: current directory type is not set to DIRECTORY\n");
+	}		
+	numentriesCurdir = curdir->bytesWritten / sizeof(struct directory_entry);	
+	
+	for (i = 0; i < numentriesCurdir; i++)
+	{
+		inode_read(curdir, entrybuf, i * sizeof(struct directory_entry), sizeof(struct directory_entry));
+		entry = (directory_entry_t) entrybuf;
+		if (strcmp(entry->name, dirname) == 0)
+		{
+			found = 1; 
+			break;
+		}
+	} 
+	if (found) 
+	{	
+		rmdir = inodes[entry->inode_num];
+		if (rmdir->type != DIRECTORY)
+		{
+			printf("rmdir target is not a directory\n");
+			return -1;
+		}
+		numentriesTarget = rmdir->bytesWritten / sizeof(struct directory_entry);	
+		if (numentriesTarget > 0)
+		{
+			printf("Target directory is nonempty\n");
+		}
+		for (i += 1; i < numentriesCurdir; i++)
+		{
+			inode_read(curdir, overwritebuf, i * sizeof(struct directory_entry), sizeof(struct directory_entry));
+			inode_write(curdir, overwritebuf, (i-1) * sizeof(struct directory_entry), sizeof(struct directory_entry));
+		}	
+		curdir->bytesWritten -= sizeof(struct directory_entry);
+		
+	}
+}
+
+inode_t find(char *path, inode_t curdir) {
+	char *next;
+	char *entrybuf;
+	int numentries;
+	directory_entry_t entry;
+	int i;
+	int found;
+			
+	entrybuf = (char *) malloc(sizeof(struct directory_entry));
+	while ((next = strtok(path, "/.")) != NULL)
+	{
+		numentries = curdir->bytesWritten / sizeof(struct directory_entry);	
+		// test if such a file already exists in the current directory
+		found = 0;
+		for (i = 0; i < numentries; i++)
+		{
+			if (curdir->type != DIRECTORY)
+			{
+				printf("hit an unexpected regular file in find\n");
+				return NULL;
+			}
+			inode_read(curdir, entrybuf, i * sizeof(struct directory_entry), sizeof(struct directory_entry));
+			entry = (directory_entry_t) entrybuf;
+			if (strcmp(entry->name, next) == 0)
+			{
+				curdir = inodes[entry->inode_num];
+				found = 1;
+				break;
+			}
+		}
+	} 
+	if (found) // curdir may be a regular file
+		return curdir;
+	return NULL;
 }
 
 int minifile_stat(char *path){
-	return -1;
+	inode_t target; 
+	if (path[0] == '/')
+	{
+		target = find(path, inodes[0]);	
+	}
+	else if (path[0] == path[1] == '.') 
+	{
+		printf("Error: system does not support ../ convention for parent directory\n");
+	}
+	else
+	{
+		target = find(path, inodes[runningThread->currentDirectoryInode]);
+	}
+	if (target == NULL)
+	{
+		printf("File not found\n");
+		return -1;
+	}
+	else
+	{
+		printf("Stats for file %s: \n", target->name);
+		printf("Type: %d, bytes written: %d, blocks allocated: %d\n", target->type, target->bytesWritten, target->size);
+		return 0;
+	}
 } 
 
 int minifile_cd(char *path){
-	return -1;
+	inode_t target; 
+	if (path[0] == '/')
+	{
+		target = find(path, inodes[0]);	
+	}
+	else if (path[0] == path[1] == '.') 
+	{
+		printf("Error: system does not support ../ convention for parent directory\n");
+	}
+	else
+	{
+		target = find(path, inodes[runningThread->currentDirectoryInode]);
+	}
+	if (target == NULL)
+	{
+		printf("Error: cd target not found\n");
+		return -1;
+	}
+	if (target->type != DIRECTORY) 
+	{
+		printf("Error: cd target is not a directory\n");
+		return -1;
+	}	
+	runningThread->currentDirectoryInode = target->id;
 }
 
 char **minifile_ls(char *path){
-	return NULL;
+	inode_t target; 
+	int numentries;
+	char *entrybuf;
+	directory_entry_t entry;
+	char **ret;
+	if (path[0] == '/')
+	{
+		target = find(path, inodes[0]);	
+	}
+	else if (path[0] == path[1] == '.') 
+	{
+		printf("Error: system does not support ../ convention for parent directory\n");
+	}
+	else
+	{
+		target = find(path, inodes[runningThread->currentDirectoryInode]);
+	}
+	if (target == NULL)
+	{
+		printf("Error: cd target not found\n");
+		return -1;
+	}
+	if (target->type != DIRECTORY) 
+	{
+		printf("Error: cd target is not a directory\n");
+		return -1;
+	}
+	numentries = target->bytesWritten / sizeof(struct directory_entry);	
+	entrybuf = (char *) malloc(sizeof(struct directory_entry));
+	ret = (char **) malloc(sizeof(char *) * numentries);
+	// test if such a file already exists in the current directory
+	for (i = 0; i < numentries; i++)
+	{
+		inode_read(target, entrybuf, i * sizeof(struct directory_entry), sizeof(struct directory_entry));
+		entry = (directory_entry_t) entrybuf;
+		ret[i] = (char *) malloc(FILENAMELEN);
+		memcpy(ret[i], entry->name, FILENAMELEN);
+	} 
+	return ret;
+}
+
+char *pwd_find(inode_t node, int target, char *path)
+{
+	inode_t target; 
+	int numentries;
+	char *entrybuf;
+	directory_entry_t entry;
+	char **ret;
+// TODO when not so sleepy
+	numentries = target->bytesWritten / sizeof(struct directory_entry);	
+	entrybuf = (char *) malloc(sizeof(struct directory_entry));
+	ret = (char **) malloc(sizeof(char *) * numentries);
+	// test if such a file already exists in the current directory
+	for (i = 0; i < numentries; i++)
+	{
+		inode_read(target, entrybuf, i * sizeof(struct directory_entry), sizeof(struct directory_entry));
+		entry = (directory_entry_t) entrybuf;
+		ret[i] = (char *) malloc(FILENAMELEN);
+		memcpy(ret[i], entry->name, FILENAMELEN);
+	}
 }
 
 char* minifile_pwd(void){
-	return NULL;
+	char *ret = (char *) malloc(FILENAMELEN * 100);
+	return pwd_find(inodes[0], runningThread->currentDirectoryInode, ret);
 }

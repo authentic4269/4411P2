@@ -24,12 +24,15 @@ typedef struct directory_entry* directory_entry_t;
 
 typedef enum {REGULARFILE,DIRECTORY,ND} inodetype;
 
+typedef enum {READ,UPDATE,WRITE,APPEND} opentype;
+
 struct block
 {
 	char data[DISK_BLOCK_SIZE];
 };
 
 struct minifile {
+	opentype type;
 	int inode;
 	int position;
 };

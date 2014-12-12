@@ -3,6 +3,7 @@
 
 #include "defs.h"
 #include "disk.h"
+#include "synch.h"
 #define TABLE_SIZE 12
 #define MAGIC_NUMBER 9805
 #define FILENAMELEN 256
@@ -78,7 +79,7 @@ struct directory_entry
 	unsigned int inode_num;
 };
 
-
+extern semaphore_t fs_init_mutex;
 extern char* current_directory;
 extern superblock_t sblock;
 

@@ -22,7 +22,7 @@ void disk_handler(void *arg)
 	semaphore_V(serial_mutex);
 }
 
-int mkfs(int *arg) {
+void mkfs(int *arg) {
 	int i, j;
 	int blockposition = 0;
 	superblock_t super;

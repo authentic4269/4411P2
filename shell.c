@@ -160,7 +160,7 @@ int shell(int *g) {
 	char command[BUFFER_SIZE];
 	char func[BUFFER_SIZE],arg1[BUFFER_SIZE],arg2[BUFFER_SIZE];
 	int i;
-
+	semaphore_P(fs_init_mutex);
 	minifile_cd("/"); //cd to root (will also initialize the system if necessary)
 	printf("%s\n", IDstring);
 

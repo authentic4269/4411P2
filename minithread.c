@@ -130,6 +130,7 @@ minithread_exit(minithread_t thread)
 	}
 	old_thread = runningThread;
 	runningThread = to_run;
+
 	minithread_switch(old_thread->stack_top, to_run->stack_top);
 }
 
@@ -586,7 +587,7 @@ void network_handler(network_interrupt_arg_t *arg) {
 void
 minithread_system_initialize(proc_t mainproc, arg_t mainarg) {
 	minithread_t mainThread = (minithread_t) malloc(sizeof(struct minithread));
-	
+	minithread_t idleThread2;	
 	minithread_t idleThread;
 	
 	alarms = new_sortedlist();
@@ -610,12 +611,12 @@ minithread_system_initialize(proc_t mainproc, arg_t mainarg) {
 
 
 	minithread_clock_init(QUANTA, clock_handler);
-	minifile_initialize();
 	miniterm_initialize();
 	miniroute_initialize();
 	minisocket_initialize();
 	minimsg_initialize();
 	miniroute_initialize();
 	network_initialize(network_handler);
+	minifile_initialize();
 	minithread_switch(idleThread->stack_top, mainThread->stack_top);	
 }

@@ -1,0 +1,1 @@
+void mkfs(int *arg);

@@ -1,11 +1,16 @@
-CS4411
-======
-We haven't tested our project except for on the first test provided. This was because we struggled with it up until the last few hours, when we were able to fix some bugs and pass the first test but did not have time to make additional progress.
+Mitchell Vogel, mjv58
 
-We did not implement the ack/sequence number technique to enforce an ordering on the stream. This, again, was due to the time constraint. 
+Project Notes
 
-Steven (say25) did most of the initial coding, Mitchell (mjv58) did most of the testing and debugging - this was consistent with our schedules, as Mitch was busy last week and Steven is busy this week. 
+My implementation requires an existing filesystem (ie, the one my mkfs creates) before the shell can be run. 
+Indirect nodes are untested, and I've had some issues doing tests with larger file sizes so those may run into trouble.
+Support for both of these cases does exist, however. 
 
-Happy TA'ing! We found this project by far to be the most difficult in the practicum thus far. 
+There is an issue shell on my machine, although I don't know if it is unique to mine. I have to enter newlines to get the prompt again
+after entering a command, and when using 'input'. This may cause issues with automated testing shell scripts.
 
-- Mitch and Steven
+My system allocates all of the root nodes direct blocks in mkfs. This may cause an issue if you try to make a tiny filesystem. I haven't
+tested with less than 64 blocks. 
+
+I learned a lot doing this project, and although it was very stressful doing it all by myself, I enjoyed it. Steven Yeh, my 
+partner, gave up contributing during the course of implementation.  

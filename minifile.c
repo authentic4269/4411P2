@@ -13,9 +13,6 @@
  *     the opened file like the position of the cursor, etc.
  */
 
- #define NUM_DIRECT_BLOCKS 11
- #define SEGMENTSIZE = 128 
- #define NUMSEGMENTS = DISKSIZE / (DISK_BLOCK_SIZE * SEGMENTSIZE)
 
 char* current_directory;
 superblock_t sBlock;
@@ -530,12 +527,15 @@ int inode_write(inode_t inode, char *data, int position, int len)
 	char *buf;
 	int targetblock;
 	while (amountRemaining > 0) {
-/*		if (currentblock < TABLE_SIZE)
+		if (currentblock < TABLE_SIZE)
 		{
 			if (inode->directblocks[currentblock] < 0) {
 				inode->directblocks[currentblock] = allocate_block();
 				buf = (char *) malloc(DISK_BLOCK_SIZE);
 				inode->size++;
+			}
+			else {
+				get_data_block(inode->directblocks[currentblock], &buf);
 			}
 			targetblock = inode->directblocks[currentblock] + sBlock->data_block_start;	
 		}
@@ -548,16 +548,6 @@ int inode_write(inode_t inode, char *data, int position, int len)
 			}
 			targetblock = get_indirect_block(inode, currentblock - TABLE_SIZE) + sBlock->data_block_start;
 		}
-*/
-		if (inode->directblocks[currentblock] < 0) {
-			inode->directblocks[currentblock] = allocate_block();
-			buf = (char *) malloc(DISK_BLOCK_SIZE);
-			inode->size++;
-		}
-		else {
-			get_data_block(inode->directblocks[currentblock], &buf);	
-		}
-		targetblock = inode->directblocks[currentblock] + sBlock->data_block_start;	
 	
 		if (amountRemaining < DISK_BLOCK_SIZE - offset)
 		{

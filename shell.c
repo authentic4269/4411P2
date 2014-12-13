@@ -8,10 +8,10 @@
 
 #include "minifile.h"
 
-#define COPY_BUFFER_SIZE 1024
+#define COPY_BUFFER_SIZE 5000
 
 #define IDstring "PortOS filesystem v1.0"
-#define BUFFER_SIZE 128
+#define BUFFER_SIZE 5000
 
 //move file from NT to our file system
 int importfile(char *fname,char *ntfname) {

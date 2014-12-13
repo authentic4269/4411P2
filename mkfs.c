@@ -54,7 +54,6 @@ void mkfs(int *arg) {
 	{
 		newinode->directblocks[i] = i;
 	}
-	newinode->indirectblock = -1;
 	disk_write_block(&newdisk, 1, buf);
 	semaphore_P(serial_mutex);	
 	free(buf);

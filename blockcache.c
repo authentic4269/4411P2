@@ -25,8 +25,8 @@ struct blockcache {
  * Return an empty blockcache.
  * blockcache will be size 0.
  */
-blockcache_t
-blockcache_new() {
+blockcache_t blockcache_new() 
+{
 	blockcache_t blockcache = (blockcache_t) malloc(sizeof(struct blockcache));
     
     //Makes sure blockcache was made sucessfully
@@ -43,8 +43,8 @@ blockcache_new() {
  * Prepend a void* to a blockcache (both specifed as parameters). Return
  * 0 (success) or -1 (failure).
  */
-int
-blockcache_insert(blockcache_t blockcache, int key, void* item) {
+int blockcache_insert(blockcache_t blockcache, int key, void* item) 
+{
 	blockcacheNode_t listNode = (blockcacheNode_t) malloc(sizeof(struct blockcacheNode));
 
 	//Check that blockcache and item exists and that listNode was properly created
@@ -73,8 +73,8 @@ blockcache_insert(blockcache_t blockcache, int key, void* item) {
  * Dequeue and return the first void* from the blockcache or NULL if blockcache
  * is empty.  Return 0 (success) or -1 (failure).
  */
-int
-blockcache_dequeue(blockcache_t blockcache, void** item) {
+int blockcache_dequeue(blockcache_t blockcache, void** item) 
+{
 	blockcacheNode_t frontNode;
 
 	//Check that blockcache and item exists
@@ -104,8 +104,8 @@ blockcache_dequeue(blockcache_t blockcache, void** item) {
 /*
  * Free the blockcache and return 0 (success) or -1 (failure).
  */
-int
-blockcache_free(blockcache_t blockcache) {
+int blockcache_free(blockcache_t blockcache) 
+{
 	blockcacheNode_t frontNode;
 	blockcacheNode_t tempNode;
 
@@ -137,8 +137,8 @@ int blockcache_isEmpty(blockcache_t blockcache)
 /*
  * Return the number of items in the blockcache.
  */
-int
-blockcache_length(blockcache_t blockcache) {
+int blockcache_length(blockcache_t blockcache) 
+{
 	//If queue is not empty
 	if (blockcache != NULL)
 		return blockcache->size;
@@ -146,8 +146,8 @@ blockcache_length(blockcache_t blockcache) {
 	return 0;
 }
 
-void
-blockcache_delete_last(blockcache_t blockcache) {
+void blockcache_delete_last(blockcache_t blockcache) 
+{
 	blockcacheNode_t lastPtr = NULL;
 	blockcacheNode_t currentPtr;
 	blockcacheNode_t secondLastPtr = NULL;
@@ -174,8 +174,8 @@ blockcache_delete_last(blockcache_t blockcache) {
  * Delete the specified item from the given blockcache.
  * Return 0 on success. Return -1 on error.
  */
-int
-blockcache_delete(blockcache_t blockcache, int id) {
+int blockcache_delete(blockcache_t blockcache, int id) 
+{
 	blockcacheNode_t nodeToDelete;
 	blockcacheNode_t lastPtr = NULL;
 	blockcacheNode_t currentPtr;
@@ -214,8 +214,7 @@ blockcache_delete(blockcache_t blockcache, int id) {
 	return -1;
 }
 
-int
-blockcache_get(blockcache_t list, int id, void **item)
+int blockcache_get(blockcache_t list, int id, void **item)
 {
 	blockcacheNode_t currentPtr;
 	

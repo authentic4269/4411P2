@@ -11,12 +11,13 @@
 #define LIMIT 30
 int x = 0;
 
-void iter(void *cur, void *ptr) {
+void iter(void *cur, void *ptr) 
+{
 	x += 1;
 }	
 
-int
-main(int argc, char *argv[]) {
+int main(int argc, char *argv[]) 
+{
 	void *hi = NULL;
 	void **ptr = &hi;
 	blockcache_t testcache = blockcache_new();

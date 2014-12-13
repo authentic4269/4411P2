@@ -122,7 +122,7 @@ int inputfile(char *fname) {
 	do {
 		memset(str,'\0',BUFFER_SIZE);
 		gets(str);
-		if(str[0] == 4) //that's what ctrl-D puts in ((char)4)
+		if(str[0] == '~') //that's what ctrl-D puts in ((char)4)
 			break;
 		str[strlen(str)] = '\n';
 		minifile_write(f,str,strlen(str));

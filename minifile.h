@@ -22,6 +22,7 @@ typedef struct block* block_t;
 typedef struct inode* inode_t;
 typedef struct superblock* superblock_t;
 typedef struct directory_entry* directory_entry_t;
+typedef struct indirectblock* indirectblock_t;
 
 
 typedef enum {REGULARFILE,DIRECTORY,ND} inodetype;
@@ -56,6 +57,11 @@ struct inode
 
 	int directblocks[TABLE_SIZE];
 	int indirectblock;
+};
+
+struct indirectblock
+{
+	int blocks[DISK_BLOCK_SIZE / sizeof(int)];
 };
 
 struct superblock 

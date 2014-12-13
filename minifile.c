@@ -4,6 +4,7 @@
 #include "queue.h"
 #include "synch.h"
 #include "minithread.h"
+#include "mkfs.h"
 #include <unistd.h>
 
 /*
@@ -45,6 +46,7 @@ int inode_read(inode_t inode, char *buf, int position, int len);
 void free_inode(inode_t inode);
 void get_data_block(int blockid, char **ret);
 int inode_write(inode_t inode, char *data, int position, int len);
+void disk_update_inode(inode_t inode);
 
 void setup_inode(void *diskarg)
 {
@@ -151,7 +153,7 @@ void setup_superblock(void *diskarg)
 	semaphore_V(fs_init_mutex);
 }
 
-inode_t allocate_inode() {
+inode_t allocate_inode(inodetype type, int parentDir, char *name) {
 	int i;
 	int j;
 	char *buf;
@@ -168,8 +170,12 @@ inode_t allocate_inode() {
 			inodes[i].size = 1;
 			inodes[i].bytesWritten = 0;
 			inodes[i].free = 0;
+			inodes[i].indirectblock = -1;
+			memcpy(inodes[i].name, name, strlen(name));
+			inodes[i].parent = parentDir;
+			inodes[i].type = type;
 			semaphore_V(allocate_inode_mutex);
-			memcpy(buf, &inodes[i], sizeof(struct inode));
+			memcpy(buf, &(inodes[i]), sizeof(struct inode));
 			disk_write_block(&disk, 1 + i, buf);
 			return &(inodes[i]);
 		}
@@ -197,7 +203,7 @@ int allocate_block() {
 				buf = (char *) malloc(DISK_BLOCK_SIZE);
 				targetblock = i / DISK_BLOCK_SIZE;
 				memcpy(buf, (free_block_bitmap + (DISK_BLOCK_SIZE * targetblock)), DISK_BLOCK_SIZE);
-				disk_write_block(&disk, sBlock->data_block_start + targetblock, buf);
+				disk_write_block(&disk, sBlock->free_blocks + targetblock, buf);
 				return (i * 8) + j;
 			}
 			andbyte  = andbyte << 1;
@@ -212,8 +218,14 @@ int allocate_block() {
 // mark data block blockid as free. 1 is free.
 void free_block(int blockid) {
 	int bitoffset = blockid % 8;
+	int targetblock = blockid / DISK_BLOCK_SIZE;
 	unsigned char orbyte = (0x01 << bitoffset);
+	char *buf = (char *) malloc(DISK_BLOCK_SIZE);
+	semaphore_P(allocate_block_mutex);
 	free_block_bitmap[blockid / 8] |= orbyte;
+	memcpy(buf, (free_block_bitmap + (DISK_BLOCK_SIZE * targetblock)), DISK_BLOCK_SIZE);
+	disk_write_block(&disk, sBlock->free_blocks + targetblock, buf);
+	semaphore_V(allocate_block_mutex);
 }
 
 void handle_disk_response(void *arg) {
@@ -231,7 +243,7 @@ void minifile_initialize()
 	blockcache = blockcache_new();
 	if (access("MINIFILESYSTEM", W_OK) < 0)
 	{
-		printf("No disk file found. If you're running mkfs, ignore this message. If you're not, please run mkfs first to create a disk before you run this program.\n");
+		printf("No disk file found, you must run mkfs in the current directory before running this program\n");	
 		return;
 	}
 	disk_name = "MINIFILESYSTEM";
@@ -284,12 +296,12 @@ minifile_t minifile_creat(char *filename)
 			return NULL;
 		}
 	} 
-	newinode = allocate_inode();	
-	newinode->type = REGULARFILE;
+	newinode = allocate_inode(REGULARFILE, runningThread->currentDirectoryInode, filename);	
 	entry = (directory_entry_t) entrybuf;
 	strcpy(entry->name, filename);
 	entry->inode_num = newinode->id;
 	inode_write(curdir, entrybuf, curdir->bytesWritten, sizeof(struct directory_entry)); 
+	newinode->references = 2; // one for the reference in the directory, one for what we return
 	ret->inode = newinode->id;
 	ret->position = 0;
 	ret->type = WRITE;
@@ -333,6 +345,7 @@ minifile_t minifile_open(char *filename, char *mode){
 		if (strcmp(entry->name, filename) == 0)
 		{
 			foundinode = entry->inode_num;
+			break;
 		}
 	} 
 
@@ -347,6 +360,7 @@ minifile_t minifile_open(char *filename, char *mode){
 			ret->type = WRITE;
 			ret->inode = foundinode;
 			ret->position = 0;
+			inodes[ret->inode].references++;
 			return ret;
 		}
 		else
@@ -354,21 +368,17 @@ minifile_t minifile_open(char *filename, char *mode){
 			ret->type = READ;
 			ret->inode = foundinode;
 			ret->position = 0;
+			inodes[ret->inode].references++;
 			return ret;
 		}
 	}
 	else if (mode[0] == 'w') 	
 	{
 		if (foundinode != 0) 
-			free_inode(&(inodes[foundinode]));
-		newinode = allocate_inode();	
-		entry = (directory_entry_t) entrybuf;
-		strcpy(entry->name, filename);
-		entry->inode_num = newinode->id;
-		inode_write(curdir, entrybuf, curdir->bytesWritten, sizeof(struct directory_entry)); 
-		ret->inode = newinode->id;
-		ret->position = 0;
-		ret->type = WRITE;
+		{
+			minifile_unlink(filename);
+		}
+		ret = minifile_creat(filename);
 		return ret;
 	}
 	else if (mode[0] == 'a')
@@ -384,11 +394,12 @@ minifile_t minifile_open(char *filename, char *mode){
 		{
 			// not actually a newinode, heh
 			newinode = &(inodes[foundinode]);
+			newinode->references++;
+			ret->inode = newinode->id;
+			ret->type = APPEND;
+			ret->position = newinode->bytesWritten;
+			return ret;
 		}
-		ret->inode = newinode->id;
-		ret->type = APPEND;
-		ret->position = newinode->bytesWritten;
-		return ret;
 	}
 	else 
 	{
@@ -405,6 +416,7 @@ int inode_read(inode_t inode, char *data, int position, int maxlen)
 	int amountToRead;
 	char *blockptr;
 	int amountLeft;
+	int targetblock;
 	curblock = position / DISK_BLOCK_SIZE;
 	blockoffset = position % DISK_BLOCK_SIZE;
 	if (maxlen > inode->bytesWritten - position) 
@@ -417,14 +429,17 @@ int inode_read(inode_t inode, char *data, int position, int maxlen)
 	}
 	amountLeft = amountToRead;
 	while (amountLeft > 0) {
-		//TODO add support for indirect blocks here
 		if (position >= inode->bytesWritten)
 		{
 			// in this case, we hit the end of the file
 			amountToRead = amountToRead - amountLeft;
 			break;
 		}	
-		get_data_block(inode->directblocks[curblock], &blockptr);		
+		if (curblock >= TABLE_SIZE)
+			targetblock = get_indirect_block(inode, curblock - TABLE_SIZE);
+		else
+			targetblock = inode->directblocks[curblock];
+		get_data_block(targetblock, &blockptr);		
 		curblock++;
 		position += (DISK_BLOCK_SIZE - blockoffset);
 		if (amountLeft > DISK_BLOCK_SIZE - blockoffset) {
@@ -467,14 +482,73 @@ void get_data_block(int blockid, char **ret)
 	}
 }
 
+int get_indirect_block(inode_t inode, int indirectBlockNum)
+{
+	char *buf;
+	indirectblock_t indirect;
+	if (inode->indirectblock < 0)
+	{
+		inode->indirectblock = allocate_block();
+	}
+	get_data_block(inode->indirectblock, &buf);
+	indirect = (indirectblock_t) buf;	
+	return indirect->blocks[indirectBlockNum];
+}
+
+void allocate_indirect_block(inode_t inode)
+{
+	indirectblock_t indirect;
+	char *buf;
+	if (inode->indirectblock < 0)
+	{
+		inode->indirectblock = allocate_block();
+	}
+	get_data_block(inode->indirectblock, &buf);
+	indirect = (indirectblock_t) buf;
+	indirect->blocks[inode->size - TABLE_SIZE] = allocate_block();
+	disk_write_block(&disk, inode->indirectblock + sBlock->data_block_start, buf);
+}
+
+void free_indirectblocks(int indirectBlockNum, int numBlocks)
+{
+	indirectblock_t indirect;
+	char *buf;
+	int i;
+	get_data_block(indirectBlockNum, &buf);
+	indirect = (indirectblock_t) buf;
+	for (i = 0; i < numBlocks; i++)
+	{
+		free_block(indirect->blocks[i]);
+	}	
+}
+
 int inode_write(inode_t inode, char *data, int position, int len)
 {
 	int currentblock = position / DISK_BLOCK_SIZE;
 	int offset = position % DISK_BLOCK_SIZE;
 	int amountRemaining = len;
 	char *buf;
+	int targetblock;
 	while (amountRemaining > 0) {
-		// TODO add support for indirect blocks here
+/*		if (currentblock < TABLE_SIZE)
+		{
+			if (inode->directblocks[currentblock] < 0) {
+				inode->directblocks[currentblock] = allocate_block();
+				buf = (char *) malloc(DISK_BLOCK_SIZE);
+				inode->size++;
+			}
+			targetblock = inode->directblocks[currentblock] + sBlock->data_block_start;	
+		}
+		else
+		{
+			if (len + (currentblock * DISK_BLOCK_SIZE) + offset >= inode->size * DISK_BLOCK_SIZE)
+			{
+				allocate_indirect_block(inode);
+				inode->size++;
+			}
+			targetblock = get_indirect_block(inode, currentblock - TABLE_SIZE) + sBlock->data_block_start;
+		}
+*/
 		if (inode->directblocks[currentblock] < 0) {
 			inode->directblocks[currentblock] = allocate_block();
 			buf = (char *) malloc(DISK_BLOCK_SIZE);
@@ -483,17 +557,19 @@ int inode_write(inode_t inode, char *data, int position, int len)
 		else {
 			get_data_block(inode->directblocks[currentblock], &buf);	
 		}
+		targetblock = inode->directblocks[currentblock] + sBlock->data_block_start;	
+	
 		if (amountRemaining < DISK_BLOCK_SIZE - offset)
 		{
 			// can fit everything into the current block
 			memcpy(buf + offset, data, amountRemaining);
 			amountRemaining = 0; 
-			disk_write_block(&disk, inode->directblocks[currentblock] + sBlock->data_block_start, buf);
+			disk_write_block(&disk, targetblock, buf);
 		}
 		else
 		{
 			memcpy(buf + offset, data, DISK_BLOCK_SIZE - offset);
-			disk_write_block(&disk, inode->directblocks[currentblock] + sBlock->data_block_start, buf);
+			disk_write_block(&disk, targetblock, buf);
 			data = data + (DISK_BLOCK_SIZE - offset);
 			offset = 0;	
 			currentblock++;
@@ -502,17 +578,28 @@ int inode_write(inode_t inode, char *data, int position, int len)
 	}
 	if (position + len > inode->bytesWritten)
 		inode->bytesWritten = position + len;	
+	disk_update_inode(inode);
 	return len;
 }
 
+void disk_update_inode(inode_t inode) 
+{
+	char *buf;
+	buf = (char *) malloc(DISK_BLOCK_SIZE);	
+	memcpy(buf, inode, sizeof(struct inode));
+	disk_write_block(&disk, 1 + inode->id, buf);
+}
 
 int minifile_write(minifile_t file, char *data, int len){
 	inode_t inode = &(inodes[file->inode]);
+	int bytesWritten;
 	if (file->type == READ) {
 		printf("Error: the file descriptor provided to minifile_write is read only\n");
 		return -1;
 	}
-	return inode_write(inode, data, file->position, len); 
+	bytesWritten = inode_write(inode, data, file->position, len);
+	file->position += bytesWritten;
+	return bytesWritten;
 }
 
 void free_inode(inode_t inode)
@@ -520,16 +607,18 @@ void free_inode(inode_t inode)
 	int i;
 	for (i = 0; i < inode->size; i++)
 	{
-		//TODO: add support for indirect blocks when inode->size > TABLE_SIZE
 		free_block(inode->directblocks[i]);	
-		inode->directblocks[i] = 0;
+		inode->directblocks[i] = -1;
 		strcpy(inode->name, "\0");
 	}	
-	inode->indirectblock = 0;
+	if (inode->indirectblock > 0)
+		free_indirectblocks(inode->indirectblock, inode->size - TABLE_SIZE);
+	inode->indirectblock = -1;
 	inode->size = 0;
 	inode->bytesWritten = 0;
 	inode->references = 0;
 	inode->free = 1;
+	disk_update_inode(inode);
 }
 
 int minifile_close(minifile_t file){
@@ -577,6 +666,11 @@ int minifile_unlink(char *filename){
 			inode_write(curdir, overwritebuf, (i-1) * sizeof(struct directory_entry), sizeof(struct directory_entry));
 		}	
 		curdir->bytesWritten -= sizeof(struct directory_entry);
+		inodes[entry->inode_num].references--;
+		if (inodes[entry->inode_num].references == 0)
+		{
+			free_inode(&(inodes[entry->inode_num]));
+		}
 		return 0;
 	}
 	printf("No such file exists\n");
@@ -588,7 +682,7 @@ int minifile_mkdir(char *dirname){
 	int numentries;
 	int i;
 	char *validname = strchr(dirname, '/');
-	char *entrybuf = (char *) malloc(sizeof(struct directory_entry));
+	char *entrybuf;
 	inode_t newinode;
 	directory_entry_t entry;
 	if (validname != NULL)
@@ -604,6 +698,7 @@ int minifile_mkdir(char *dirname){
 	// test if such a file already exists in the current directory
 	for (i = 0; i < numentries; i++)
 	{
+		entrybuf = (char *) malloc(sizeof(struct directory_entry));
 		inode_read(curdir, entrybuf, i * sizeof(struct directory_entry), sizeof(struct directory_entry));
 		entry = (directory_entry_t) entrybuf;
 		if (strcmp(entry->name, dirname) == 0)
@@ -612,12 +707,11 @@ int minifile_mkdir(char *dirname){
 			return -1;
 		}
 	} 
-	newinode = allocate_inode();	
-	newinode->type = DIRECTORY;
+	entrybuf = (char *) malloc(sizeof(struct directory_entry));
+	newinode = allocate_inode(DIRECTORY, runningThread->currentDirectoryInode, dirname);	
 	newinode->parent = curdir->id;
 	entry = (directory_entry_t) entrybuf;
 	strcpy(entry->name, dirname);
-	strcpy(newinode->name, dirname);
 	entry->inode_num = newinode->id;
 	inode_write(curdir, entrybuf, curdir->bytesWritten, sizeof(struct directory_entry)); 
 	return 0;
@@ -721,8 +815,8 @@ inode_t find(char *path, inode_t curdir) {
 	return curdir;
 }
 
-int minifile_stat(char *path){
-	inode_t target; 
+inode_t resolve_pathname(char *path) {
+	inode_t target;
 	char newpath[FILENAMELEN * 30];
 	if (path[0] == '/')
 	{
@@ -737,19 +831,31 @@ int minifile_stat(char *path){
 		if (runningThread->currentDirectoryInode == 0)
 		{
 			printf("Can't specify a path relative to parent directory from the root node\n");
-			return -1;
+			return NULL;
 		}
-		strncpy(newpath, (path + 3), strlen(path)-3);
-		if (strlen(newpath) == 0)
+		if (strlen(path) == 2)
 			target = &(inodes[inodes[runningThread->currentDirectoryInode].parent]);
-		else
+		else {
+			strncpy(newpath, (path + 2), strlen(path)-2);
 			target = find(newpath, &(inodes[inodes[runningThread->currentDirectoryInode].parent]));
+		}
 	
+	}
+	else if (path[0] == '.')
+	{
+		strncpy(newpath, path + 1, strlen(path)-1);
+		target = find(newpath, &(inodes[runningThread->currentDirectoryInode]));
 	}
 	else
 	{
 		target = find(path, &(inodes[runningThread->currentDirectoryInode]));
 	}
+	return target;
+}
+
+int minifile_stat(char *path){
+	inode_t target; 
+	target = resolve_pathname(path);
 	if (target == NULL)
 	{
 		printf("File not found\n");
@@ -759,38 +865,13 @@ int minifile_stat(char *path){
 	{
 		printf("Stats for file %s: \n", target->name);
 		printf("Type: %d, bytes written: %d, blocks allocated: %d\n", target->type, target->bytesWritten, target->size);
-		return 0;
+		return target->bytesWritten;
 	}
 } 
 
 int minifile_cd(char *path){
 	inode_t target; 
-	char newpath[FILENAMELEN * MAX_FS_DEPTH];
-	if (path[0] == '/')
-	{
-		strncpy(newpath, (path + 1), strlen(path)-1);
-		if (strlen(path) == 1)
-			target = &(inodes[0]);
-		else
-			target = find(newpath, &(inodes[0]));	
-	}
-	else if ((path[0] == path[1]) && (path[0] == '.')) 
-	{
-		if (runningThread->currentDirectoryInode == 0)
-		{
-			printf("Can't specify a path relative to parent directory from the root node\n");
-			return -1;
-		}
-		strncpy(newpath, (path + 3), strlen(path)-3);
-		if (strlen(newpath) == 0)
-			target = &(inodes[inodes[runningThread->currentDirectoryInode].parent]);
-		else
-			target = find(newpath, &(inodes[inodes[runningThread->currentDirectoryInode].parent]));
-	}
-	else
-	{
-		target = find(path, &(inodes[runningThread->currentDirectoryInode]));
-	}
+	target = resolve_pathname(path);
 	if (target == NULL)
 	{
 		printf("Error: cd target not found\n");
@@ -812,32 +893,7 @@ char **minifile_ls(char *path){
 	char *entrybuf;
 	directory_entry_t entry;
 	char **ret;
-	char newpath[FILENAMELEN * MAX_FS_DEPTH];
-	if (path[0] == '/')
-	{
-		strncpy(newpath, (path + 1), strlen(path)-1);
-		if (strlen(path) == 1)
-			target = &(inodes[0]);
-		else
-			target = find(newpath, &(inodes[0]));	
-	}
-	else if (path[0] == path[1] && path[0] == '.') 
-	{
-		if (runningThread->currentDirectoryInode == 0)
-		{
-			printf("Can't specify a path relative to parent directory from the root node\n");
-			return NULL;
-		}
-		strncpy(newpath, (path + 3), strlen(path)-3);
-		if (strlen(newpath) == 0)
-			target = &(inodes[inodes[runningThread->currentDirectoryInode].parent]);
-		else
-			target = find(newpath, &(inodes[inodes[runningThread->currentDirectoryInode].parent]));
-	}
-	else
-	{
-		target = find(path, &(inodes[runningThread->currentDirectoryInode]));
-	}
+	target = resolve_pathname(path);
 	if (target == NULL)
 	{
 		printf("Error: ls target not found\n");
@@ -866,21 +922,26 @@ char **minifile_ls(char *path){
 }
 
 char* minifile_pwd(void){
-	char *ret = (char *) malloc(FILENAMELEN * 100);
+	char *ret;
 	char **entries = (char **) malloc(sizeof(char *) * MAX_FS_DEPTH);
 	int cur = runningThread->currentDirectoryInode;
-	int i = 0;
+	int i;
 	int j;
+	ret = (char *) malloc(FILENAMELEN * MAX_FS_DEPTH + MAX_FS_DEPTH);
+	for (i = 0; i < FILENAMELEN * MAX_FS_DEPTH + MAX_FS_DEPTH; i++)
+		ret[i] = '\0';
+	i = 0;
 	while (cur != 0)
 	{
 		entries[i] = inodes[cur].name;
 		i++;
 		cur = inodes[cur].parent;
 	}
-	for (j = 0; j < i; j++)
+	strcat(ret, "/");
+	for (j = 1; j <= i; j++)
 	{
-		strcat(ret, "/");
 		strcat(ret, entries[i-j]);
+		strcat(ret, "/");
 	}
 	return ret;
 }

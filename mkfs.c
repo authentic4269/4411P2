@@ -10,6 +10,7 @@
 
 
 semaphore_t serial_mutex;
+int file_fd;
 
 void disk_handler(void *arg)
 {
@@ -30,6 +31,7 @@ void mkfs(int *arg) {
 	inode_t newinode;
 	char *buf;
 	int bitmapsz;
+	close(file_fd);
 	disk_size = *arg;
 	use_existing_disk = 0;
 	disk_name = "MINIFILESYSTEM";
@@ -52,6 +54,7 @@ void mkfs(int *arg) {
 	{
 		newinode->directblocks[i] = i;
 	}
+	newinode->indirectblock = -1;
 	disk_write_block(&newdisk, 1, buf);
 	semaphore_P(serial_mutex);	
 	free(buf);
